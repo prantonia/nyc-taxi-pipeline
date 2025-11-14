@@ -1,0 +1,89 @@
+name: NYC Taxi Pipeline CI/CD
+
+on:
+  push:
+    branches: [ dev, main ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run flake8 linting
+      run: |
+        flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Run pytest
+      run: |
+        pytest tests/ -v --tb=short
+    
+    - name: Check code formatting with black
+      run: |
+        black --check src/ tests/
+      continue-on-error: true
+    
+    - name: Generate coverage report
+      run: |
+        pytest tests/ --cov=src --cov-report=term-missing
+      continue-on-error: true
+    
+    - name: Test import structure
+      run: |
+        python -c "from src.orchestrator import PipelineOrchestrator; print('✓ Import test passed')"
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: /tmp/dummy-credentials.json
+      continue-on-error: true
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Run Bandit security scan
+      uses: tj-actions/bandit@v5.1
+      with:
+        targets: |
+          src/
+        options: "-r --severity-level medium"
+      continue-on-error: true
+
+  notify:
+    needs: [lint-and-test]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        if [ "${{ needs.lint-and-test.result }}" == "success" ]; then
+          echo "All checks passed!"
+        else
+          echo "Some checks failed"
+          exit 1
+        fi

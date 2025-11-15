@@ -12,37 +12,59 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# GCP Configuration - MUST be set in .env file
+# Check if we're in test/CI mode
+IS_TEST_MODE = (
+    os.getenv('PYTEST_CURRENT_TEST') is not None 
+    or os.getenv('CI') == 'true'
+    or os.getenv('TESTING') == 'true'
+)
+
+# GCP Configuration - MUST be set in .env file (except in test mode)
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 DATASET_ID = os.getenv("BQ_DATASET")
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
-# Validate required environment variables
-if not PROJECT_ID:
-    raise ValueError("GCP_PROJECT_ID must be set in .env file")
-if not DATASET_ID:
-    raise ValueError("BQ_DATASET must be set in .env file")
-if not CREDENTIALS_PATH:
-    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS must be set in .env file")
+# Validate required environment variables (skip in test mode)
+if not IS_TEST_MODE:
+    if not PROJECT_ID:
+        raise ValueError("GCP_PROJECT_ID must be set in .env file")
+    if not DATASET_ID:
+        raise ValueError("BQ_DATASET must be set in .env file")
+    if not CREDENTIALS_PATH:
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS must be set in .env file")
+else:
+    # Set test defaults when in test mode
+    PROJECT_ID = PROJECT_ID or 'test-project-id'
+    DATASET_ID = DATASET_ID or 'test_dataset'
+    CREDENTIALS_PATH = CREDENTIALS_PATH or './test-credentials.json'
+    logger.debug("Running in TEST MODE with default test values")
 
-# Table Names - MUST be set in .env file
+# Table Names - MUST be set in .env file (except in test mode)
 STAGING_TABLE_NAME = os.getenv("STAGING_TABLE_NAME")
 RAW_TABLE_NAME = os.getenv("RAW_TABLE_NAME")
 SILVER_TABLE_NAME = os.getenv("SILVER_TABLE_NAME")
 GOLD_TABLE_NAME = os.getenv("GOLD_TABLE_NAME")
 METADATA_TABLE_NAME = os.getenv("METADATA_TABLE_NAME")
 
-# Validate table names
-if not STAGING_TABLE_NAME:
-    raise ValueError("STAGING_TABLE_NAME must be set in .env file")
-if not RAW_TABLE_NAME:
-    raise ValueError("RAW_TABLE_NAME must be set in .env file")
-if not SILVER_TABLE_NAME:
-    raise ValueError("SILVER_TABLE_NAME must be set in .env file")
-if not GOLD_TABLE_NAME:
-    raise ValueError("GOLD_TABLE_NAME must be set in .env file")
-if not METADATA_TABLE_NAME:
-    raise ValueError("METADATA_TABLE_NAME must be set in .env file")
+# Validate table names (skip in test mode)
+if not IS_TEST_MODE:
+    if not STAGING_TABLE_NAME:
+        raise ValueError("STAGING_TABLE_NAME must be set in .env file")
+    if not RAW_TABLE_NAME:
+        raise ValueError("RAW_TABLE_NAME must be set in .env file")
+    if not SILVER_TABLE_NAME:
+        raise ValueError("SILVER_TABLE_NAME must be set in .env file")
+    if not GOLD_TABLE_NAME:
+        raise ValueError("GOLD_TABLE_NAME must be set in .env file")
+    if not METADATA_TABLE_NAME:
+        raise ValueError("METADATA_TABLE_NAME must be set in .env file")
+else:
+    # Set test defaults for table names
+    STAGING_TABLE_NAME = STAGING_TABLE_NAME or 'staging_yellow_taxi'
+    RAW_TABLE_NAME = RAW_TABLE_NAME or 'raw_yellow_taxi'
+    SILVER_TABLE_NAME = SILVER_TABLE_NAME or 'silver_yellow_taxi'
+    GOLD_TABLE_NAME = GOLD_TABLE_NAME or 'gold_yellow_taxi'
+    METADATA_TABLE_NAME = METADATA_TABLE_NAME or 'pipeline_metadata'
 
 # Build fully qualified table names
 STAGING_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{STAGING_TABLE_NAME}"
@@ -55,11 +77,16 @@ METADATA_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{METADATA_TABLE_NAME}"
 NYC_TAXI_BASE_URL = os.getenv("NYC_TAXI_BASE_URL")
 TAXI_FILE_TEMPLATE = os.getenv("TAXI_FILE_TEMPLATE")
 
-# Validate data source configuration
-if not NYC_TAXI_BASE_URL:
-    raise ValueError("NYC_TAXI_BASE_URL must be set in .env file")
-if not TAXI_FILE_TEMPLATE:
-    raise ValueError("TAXI_FILE_TEMPLATE must be set in .env file")
+# Validate data source configuration (skip in test mode)
+if not IS_TEST_MODE:
+    if not NYC_TAXI_BASE_URL:
+        raise ValueError("NYC_TAXI_BASE_URL must be set in .env file")
+    if not TAXI_FILE_TEMPLATE:
+        raise ValueError("TAXI_FILE_TEMPLATE must be set in .env file")
+else:
+    # Set test defaults
+    NYC_TAXI_BASE_URL = NYC_TAXI_BASE_URL or 'https://d37ci6vzurychx.cloudfront.net/trip-data'
+    TAXI_FILE_TEMPLATE = TAXI_FILE_TEMPLATE or 'yellow_tripdata_2024-{month:02d}.parquet'
 
 # Year Configuration
 TARGET_YEAR = 2024
@@ -172,7 +199,8 @@ def validate_config():
     if not DATASET_ID:
         errors.append("BQ_DATASET is not set")
 
-    if not os.path.exists(CREDENTIALS_PATH):
+    # Skip file existence check in test mode
+    if not IS_TEST_MODE and not os.path.exists(CREDENTIALS_PATH):
         errors.append(f"Service account file not found: {CREDENTIALS_PATH}")
 
     if errors:
@@ -187,6 +215,7 @@ if __name__ == "__main__":
 
     logger.info("NYC Taxi Pipeline Configuration")
     logger.info("=" * 50)
+    logger.info(f"Test Mode: {IS_TEST_MODE}")
     logger.info(f"Project ID: {PROJECT_ID}")
     logger.info(f"Dataset ID: {DATASET_ID}")
     logger.info(f"Staging Table: {STAGING_TABLE}")
@@ -200,6 +229,6 @@ if __name__ == "__main__":
 
     try:
         validate_config()
-        logger.info("Configuration is valid")
+        logger.info("✓ Configuration is valid")
     except ValueError as e:
-        logger.error(f"Configuration error: {e}")
+        logger.error(f"✗ Configuration error: {e}")

@@ -10,68 +10,10 @@ This document explains the architectural decisions, design patterns, and technic
 
 ### **High-Level Architecture**
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Data Source Layer                         │
-│  NYC TLC Parquet Files (https://d37ci6vzurychx.cloudfront.net)  │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                                │ PyArrow Download (3x faster)
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Orchestration Layer                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐       │
-│  │   Python    │  │   Retry      │  │    Metadata     │       │
-│  │Orchestrator │─▶│   Handler    │─▶│    Manager      │       │
-│  └─────────────┘  └──────────────┘  └─────────────────┘       │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                                │ BigQuery Client (PyArrow)
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Data Storage Layer                          │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  STAGING (Bronze) - Partitioned by source_month          │  │
-│  │  • Raw data with metadata                                 │  │
-│  │  • Includes date infiltrations                            │  │
-│  │  • Used for idempotency checks                            │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                │                                 │
-│                                │ Filter 2024                     │
-│                                ▼                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  RAW (Bronze) - 2024 data only                           │  │
-│  │  • Removes infiltrations                                  │  │
-│  │  • CREATE OR REPLACE pattern                              │  │
-│  │  • No metadata columns                                    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                │                                 │
-│                                │ Transform                       │
-│                                ▼                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  SILVER (Silver) - Cleaned & Standardized                │  │
-│  │  • Renamed columns (snake_case)                           │  │
-│  │  • Type conversions                                       │  │
-│  │  • Business-friendly names                                │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                │                                 │
-│                                │ Aggregate                       │
-│                                ▼                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  GOLD (Gold) - Analytics-Ready                           │  │
-│  │  • Daily + Payment Type granularity                       │  │
-│  │  • Pre-calculated metrics                                 │  │
-│  │  • Optimized for BI tools                                 │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  METADATA - Pipeline Tracking                            │  │
-│  │  • Execution history                                      │  │
-│  │  • Status tracking                                        │  │
-│  │  • Performance metrics                                    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+
+
+---
 
 ---
 
@@ -124,12 +66,12 @@ This document explains the architectural decisions, design patterns, and technic
    ```sql
    PARTITION BY source_month
    ```
-   
+
    **Why:**
    - FREE idempotency checks (no full table scan)
    - Efficient monthly queries
    - Handles date infiltrations
-   
+
    **Cost Impact:**
    - Free: `SELECT COUNT(*) FROM staging WHERE source_month = 7`
    - Expensive: `SELECT COUNT(*) FROM staging WHERE EXTRACT(MONTH FROM ...) = 7`
@@ -140,7 +82,7 @@ This document explains the architectural decisions, design patterns, and technic
    source_filename STRING,
    upload_timestamp TIMESTAMP
    ```
-   
+
    **Why:**
    - Track data provenance
    - Debug data issues
@@ -153,7 +95,7 @@ This document explains the architectural decisions, design patterns, and technic
 **Design Choices:**
 
 1. **No Partitioning:**
-   
+
    **Why:**
    - Simpler queries downstream
    - No partition pruning needed
@@ -164,7 +106,7 @@ This document explains the architectural decisions, design patterns, and technic
    CREATE OR REPLACE TABLE raw AS
    SELECT * FROM staging WHERE year = 2024
    ```
-   
+
    **Why:**
    - Removes infiltrations automatically
    - Always in sync with staging
@@ -184,7 +126,7 @@ This document explains the architectural decisions, design patterns, and technic
 |-----------|--------|---------|-------------|
 | Download 3M rows | 8 sec | 2.7 sec | **3x faster** |
 | Upload 3M rows | 90 sec | 30 sec | **3x faster** |
-| Memory usage | 10 GB | 7.5 GB | **25% less** |
+| Memory usage | 10 GB |5 GB | **50% less** |
 
 #### **Technical Benefits**
 
@@ -198,7 +140,7 @@ This document explains the architectural decisions, design patterns, and technic
    # PyArrow Table → BigQuery (fast)
    arrow_table = pa.Table.from_pandas(df)
    client.load_table_from_dataframe(arrow_table, table_id)
-   
+
    # vs Pandas DataFrame → BigQuery (slow)
    client.load_table_from_dataframe(df, table_id)
    ```
@@ -344,8 +286,8 @@ for month in range(1, 13):
 
 ```sql
 -- Automatically determine next month
-SELECT MAX(month_loaded) + 1 
-FROM metadata 
+SELECT MAX(month_loaded) + 1
+FROM metadata
 WHERE status IN ('SUCCESS', 'SKIPPED')
 ```
 
@@ -458,8 +400,8 @@ PARTITION BY DATE(pickup_datetime)
 
 ```sql
 -- This query SEVERELY undercounts!
-SELECT COUNT(*) 
-FROM raw 
+SELECT COUNT(*)
+FROM raw
 WHERE EXTRACT(YEAR FROM pickup_datetime) = 2024
 
 -- Returns: 1,000,000 (WRONG!)
@@ -475,7 +417,7 @@ WHERE EXTRACT(YEAR FROM pickup_datetime) = 2024
 ```sql
 CREATE TABLE raw AS
 SELECT * FROM staging
-WHERE pickup_datetime >= '2024-01-01' 
+WHERE pickup_datetime >= '2024-01-01'
   AND pickup_datetime < '2025-01-01'
 ```
 
@@ -644,5 +586,5 @@ WHERE pickup_datetime >= '2024-01-01'
 
 ---
 
-**Last Updated:** November 2024  
+**Last Updated:** November 2024
 **Version:** 1.0

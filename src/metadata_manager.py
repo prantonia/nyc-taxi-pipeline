@@ -106,7 +106,7 @@ class MetadataManager:
         """
         try:
             query = f"""
-                SELECT 
+                SELECT
                     pipeline_name,
                     date_range,
                     month_loaded,
@@ -388,7 +388,7 @@ class MetadataManager:
         """
         try:
             query = f"""
-                SELECT 
+                SELECT
                     pipeline_name,
                     date_range,
                     month_loaded,

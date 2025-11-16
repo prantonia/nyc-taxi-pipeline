@@ -18,17 +18,9 @@ This document provides comprehensive definitions for all columns across all tabl
 
 ## **Staging Layer (Bronze)**
 
-**Table:** `staging_yellow_taxi`  
-**Purpose:** Stores raw data exactly as received from source  
-**Partitioning:** By `source_month` (1-12)
+**Table:** `staging_yellow_taxi`
+**Purpose:** Stores raw data exactly as received from source
 
-### **Metadata Columns**
-
-| Column Name | Data Type | Description | Example |
-|-------------|-----------|-------------|---------|
-| `source_month` | INT64 | Source parquet file month (1-12) | 1 (January) |
-| `source_filename` | STRING | Original parquet filename | yellow_tripdata_2024-01.parquet |
-| `upload_timestamp` | TIMESTAMP | When data was loaded to staging | 2024-11-13 10:30:00 UTC |
 
 ### **Trip Data Columns**
 
@@ -66,16 +58,13 @@ This document provides comprehensive definitions for all columns across all tabl
 
 ## **Raw Layer (Bronze)**
 
-**Table:** `raw_yellow_taxi`  
-**Purpose:** Validated 2024 data only, filtered from staging  
+**Table:** `raw_yellow_taxi`
+**Purpose:** Validated 2024 data only, filtered from staging
 **Partitioning:** None (regular table)
 
 ### **Columns**
 
 Same as Staging Layer **except**:
-- No `source_month` (metadata removed)
-- No `source_filename` (metadata removed)
-- No `upload_timestamp` (metadata removed)
 - Only 2024 trips (WHERE EXTRACT(YEAR FROM tpep_pickup_datetime) = 2024)
 - Removes date infiltrations
 
@@ -84,7 +73,7 @@ Same as Staging Layer **except**:
 ### **Filtering Logic**
 
 ```sql
-SELECT 
+SELECT
     VendorID,
     tpep_pickup_datetime,
     -- ... all other columns except metadata
@@ -96,8 +85,8 @@ WHERE EXTRACT(YEAR FROM tpep_pickup_datetime) = 2024
 
 ## **Silver Layer (Silver)**
 
-**Table:** `silver_yellow_taxi`  
-**Purpose:** Cleaned and standardized data with business-friendly names  
+**Table:** `silver_yellow_taxi`
+**Purpose:** Cleaned and standardized data with business-friendly names
 **Partitioning:** None
 
 ### **Columns**
@@ -138,8 +127,8 @@ Applied during Silver layer creation:
 
 ## **Gold Layer (Gold)**
 
-**Table:** `gold_daily_metrics`  
-**Purpose:** Aggregated business metrics for analytics  
+**Table:** `gold_daily_metrics`
+**Purpose:** Aggregated business metrics for analytics
 **Granularity:** Daily + Payment Type
 
 ### **Columns**
@@ -193,7 +182,7 @@ This table enables analysis of:
 
 ## **Metadata Table**
 
-**Table:** `pipeline_metadata`  
+**Table:** `pipeline_metadata`
 **Purpose:** Track all pipeline execution history
 
 ### **Columns**
@@ -251,7 +240,7 @@ This table is used to:
 ### **Check Staging Partitions**
 
 ```sql
-SELECT 
+SELECT
     source_month,
     COUNT(*) as row_count,
     MIN(tpep_pickup_datetime) as min_date,
@@ -264,7 +253,7 @@ ORDER BY source_month;
 ### **Verify 2024 Data in Raw**
 
 ```sql
-SELECT 
+SELECT
     EXTRACT(YEAR FROM tpep_pickup_datetime) as year,
     COUNT(*) as row_count
 FROM `raw_yellow_taxi`
@@ -275,7 +264,7 @@ ORDER BY year;
 ### **Silver Layer Stats**
 
 ```sql
-SELECT 
+SELECT
     COUNT(*) as total_rows,
     COUNT(DISTINCT DATE(pickup_datetime)) as unique_days,
     MIN(pickup_datetime) as first_trip,
@@ -286,7 +275,7 @@ FROM `silver_yellow_taxi`;
 ### **Gold Layer Summary**
 
 ```sql
-SELECT 
+SELECT
     payment_type,
     COUNT(*) as days_with_data,
     SUM(trip_count) as total_trips,
@@ -315,5 +304,5 @@ ORDER BY payment_type;
 
 ---
 
-**Last Updated:** November 2024  
+**Last Updated:** November 2024
 **Version:** 1.0

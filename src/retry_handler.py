@@ -6,7 +6,6 @@ import logging
 import time
 from typing import Callable, Any, Optional
 from functools import wraps
-
 from src.config import MAX_RETRIES, RETRY_DELAY
 
 # Setup logger

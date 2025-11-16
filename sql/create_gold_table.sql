@@ -10,18 +10,18 @@ WITH monthly_stats AS (
         pickup_month,
         FORMAT_DATE('%B', DATE(pickup_year, pickup_month, 1)) AS month_name,
         DATE(pickup_year, pickup_month, 1) AS month_start_date,
-        
+
         -- Trip metrics
         COUNT(*) AS total_trips,
         SUM(trip_distance) AS total_distance,
         ROUND(AVG(trip_distance), 2) AS avg_distance,
         ROUND(AVG(trip_duration_minutes), 2) AS avg_duration_minutes,
         ROUND(AVG(avg_speed_mph), 2) AS avg_speed_mph,
-        
+
         -- Passenger metrics
         SUM(passenger_count) AS total_passengers,
         ROUND(AVG(passenger_count), 2) AS avg_passengers_per_trip,
-        
+
         -- Revenue metrics
         ROUND(SUM(fare_amount), 2) AS total_fare,
         ROUND(AVG(fare_amount), 2) AS avg_fare,
@@ -29,18 +29,18 @@ WITH monthly_stats AS (
         ROUND(AVG(tip_amount), 2) AS avg_tip,
         ROUND(SUM(total_amount), 2) AS total_revenue,
         ROUND(AVG(total_amount), 2) AS avg_total,
-        
+
         -- Payment type breakdown
         SUM(CASE WHEN payment_type = 1 THEN 1 ELSE 0 END) AS credit_card_trips,
         SUM(CASE WHEN payment_type = 2 THEN 1 ELSE 0 END) AS cash_trips,
         ROUND(SUM(CASE WHEN payment_type = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS credit_card_pct,
-        
+
         -- Time-based metrics
         SUM(CASE WHEN pickup_hour BETWEEN 6 AND 9 THEN 1 ELSE 0 END) AS morning_rush_trips,
         SUM(CASE WHEN pickup_hour BETWEEN 16 AND 19 THEN 1 ELSE 0 END) AS evening_rush_trips,
         SUM(CASE WHEN pickup_dayofweek IN (1, 7) THEN 1 ELSE 0 END) AS weekend_trips,
         SUM(CASE WHEN pickup_dayofweek BETWEEN 2 AND 6 THEN 1 ELSE 0 END) AS weekday_trips
-        
+
     FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.silver_yellow_taxi`
     GROUP BY pickup_year, pickup_month
 ),
@@ -50,13 +50,13 @@ daily_stats AS (
         DATE(pickup_datetime) AS trip_date,
         FORMAT_DATE('%A', DATE(pickup_datetime)) AS day_name,
         pickup_dayofweek,
-        
+
         COUNT(*) AS daily_trips,
         ROUND(SUM(total_amount), 2) AS daily_revenue,
         ROUND(AVG(trip_distance), 2) AS avg_distance,
         ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
         ROUND(AVG(fare_amount), 2) AS avg_fare
-        
+
     FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.silver_yellow_taxi`
     GROUP BY trip_date, day_name, pickup_dayofweek
 ),
@@ -65,13 +65,13 @@ hourly_stats AS (
     SELECT
         pickup_hour,
         CONCAT('Hour ', CAST(pickup_hour AS STRING), ':00') AS hour_label,
-        
+
         COUNT(*) AS trips_per_hour,
         ROUND(AVG(trip_distance), 2) AS avg_distance,
         ROUND(AVG(total_amount), 2) AS avg_revenue,
         ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
         ROUND(SUM(total_amount), 2) AS total_revenue_hour
-        
+
     FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.silver_yellow_taxi`
     GROUP BY pickup_hour
 ),
@@ -83,7 +83,7 @@ location_stats AS (
         ROUND(AVG(trip_distance), 2) AS avg_trip_distance,
         ROUND(AVG(total_amount), 2) AS avg_revenue,
         ROUND(SUM(total_amount), 2) AS total_revenue_location
-        
+
     FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.silver_yellow_taxi`
     GROUP BY PULocationID
     HAVING COUNT(*) > 1000  -- Only significant locations

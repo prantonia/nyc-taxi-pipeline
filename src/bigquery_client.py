@@ -222,7 +222,7 @@ class BigQueryClient:
         try:
             where_sql = f"WHERE {where_clause}" if where_clause else ""
             query = f"""
-                SELECT 
+                SELECT
                     MIN({datetime_column}) as min_dt,
                     MAX({datetime_column}) as max_dt
                 FROM `{table_id}`

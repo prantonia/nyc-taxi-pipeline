@@ -1,6 +1,6 @@
 # NYC Taxi Data Pipeline
 
-![CI Status](https://github.com/prantonia/nyc-taxi-pipeline/workflows/CI%20Pipeline/badge.svg)
+[![NYC Taxi Pipeline CI/CD](https://github.com/prantonia/nyc-taxi-pipeline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/prantonia/nyc-taxi-pipeline/actions/workflows/ci.yml)
 ![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)
@@ -153,10 +153,10 @@ python run_full_refresh.py
    ```bash
    # Create virtual environment
    python3.9 -m venv venv
-   
+
    # Activate (Linux/Mac)
    source venv/bin/activate
-   
+
    # Activate (Windows)
    venv\Scripts\activate
    ```
@@ -172,7 +172,7 @@ python run_full_refresh.py
    # Create service account on GCP
    # Download JSON key file
    # Save as service-account-key.json in project root
-   
+
    # Update src/config.py:
    PROJECT_ID = "your-project-id"
    DATASET_ID = "your_dataset"
@@ -272,9 +272,9 @@ nyc-taxi-pipeline/
 │   └── ci.yml
 │
 ├── docs/                       # Documentation
-│   ├── ARCHITECTURE.md
-│   ├── DATA_DICTIONARY.md
-│   ├── ORCHESTRATION_LOGIC.md
+│   ├── architecture.md
+│   ├── data_dictionary.md
+│   ├── orchestration_logic.md
 │   └── ...
 │
 ├── README.md
@@ -292,7 +292,7 @@ nyc-taxi-pipeline/
 | **Full Refresh** | Initial load, complete refresh | ~20 min | ~$5 |
 | **Incremental** | Add new months, regular updates | ~5 min | ~$5/month |
 
-See [docs/FULL_VS_INCREMENTAL.md](docs/FULL_VS_INCREMENTAL.md) for details.
+See [docs/full_vs_incremental.md](docs/full_vs_incremental.md) for details.
 
 ---
 
@@ -319,7 +319,7 @@ Automated checks on every push:
 - Code coverage
 - Code formatting (black)
 
-See [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md) for details.
+See [docs/ci_cd_setup.md](docs/ci_cd_setup.md) for details.
 
 ---
 
@@ -331,16 +331,6 @@ See [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md) for details.
 | [DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) | Data definitions |
 | [ORCHESTRATION_LOGIC.md](docs/ORCHESTRATION_LOGIC.md) | Pipeline logic |
 | [EXAMPLE_QUERIES.md](docs/EXAMPLE_QUERIES.md) | Analytics queries |
-
----
-
-## ⚡ **Performance**
-
-| Metric | Without PyArrow | With PyArrow | Improvement |
-|--------|----------------|--------------|-------------|
-| Download | 120 sec | 40 sec | 3x faster |
-| Upload | 18 min | 6 min | 3x faster |
-| Memory | 10 GB | 7.5 GB | 25% less |
 
 ---
 

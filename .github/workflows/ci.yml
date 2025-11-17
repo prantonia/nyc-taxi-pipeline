@@ -145,7 +145,7 @@ jobs:
     
     - name: Create BigQuery tables
       run: |
-        python src/create_tables.py
+        python -m src.create_tables
       timeout-minutes: 10
     
     - name: Verify table creation

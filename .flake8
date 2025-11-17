@@ -1,7 +1,5 @@
-# FILE: .flake8
-# PURPOSE: Flake8 linter configuration
-
 [flake8]
+
 max-line-length = 130
 exclude =
     .git,
@@ -19,8 +17,7 @@ ignore =
     E203,  
     E266,
     W293,  
-    W503,  
-    F401,  
+    W503,    
     E731,  
 per-file-ignores =
     __init__.py: F401

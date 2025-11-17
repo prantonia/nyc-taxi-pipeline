@@ -233,6 +233,6 @@ if __name__ == "__main__":
 
     try:
         validate_config()
-        logger.info("✓ Configuration is valid")
+        logger.info("Configuration is valid")
     except ValueError as e:
-        logger.error(f"✗ Configuration error: {e}")
+        logger.error(f"Configuration error: {e}")

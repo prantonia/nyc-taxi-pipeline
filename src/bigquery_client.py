@@ -8,7 +8,6 @@ from typing import Optional
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
 import pandas as pd
-
 from src.config import PROJECT_ID, CREDENTIALS_PATH
 
 # Setup logger

@@ -167,9 +167,9 @@ This document explains the architectural decisions, design patterns, and technic
 **Why it fails:**
 ```
 January file includes:
-- 2,900,000 January 2024 trips ✓
-- 50,000 January 2009 trips (infiltration) ✗
-- 10,000 February 2024 trips (infiltration) ✗
+- 2,900,000 January 2024 trips
+- 50,000 January 2009 trips (infiltration)
+- 10,000 February 2024 trips (infiltration)
 ```
 
 **Date range check would:**
@@ -255,7 +255,7 @@ load_to_bigquery(df)        # Out of memory!
 # This WORKS:
 for month in range(1, 13):
     df = download_month(month)  # 0.8 GB in RAM
-    load_to_bigquery(df)        # ✓ Completes successfully
+    load_to_bigquery(df)        # Completes successfully
 ```
 
 **Memory Usage:**

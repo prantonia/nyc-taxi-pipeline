@@ -94,7 +94,7 @@ A production-grade data engineering pipeline for processing NYC Taxi trip data u
 - **Metadata Manager** - Tracks pipeline execution history
 - **Retry Handler** - Implements exponential backoff logic
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
+See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
 
 ---
 
@@ -145,14 +145,14 @@ python run_full_refresh.py
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/nyc-taxi-pipeline.git
+   git clone https://github.com/prantonia/nyc-taxi-pipeline.git
    cd nyc-taxi-pipeline
    ```
 
 2. **Set Up Python Environment**
    ```bash
    # Create virtual environment
-   python3.9 -m venv venv
+   python3.12 -m venv venv
 
    # Activate (Linux/Mac)
    source venv/bin/activate
@@ -327,10 +327,10 @@ See [docs/ci_cd_setup.md](docs/ci_cd_setup.md) for details.
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture |
-| [DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) | Data definitions |
-| [ORCHESTRATION_LOGIC.md](docs/ORCHESTRATION_LOGIC.md) | Pipeline logic |
-| [EXAMPLE_QUERIES.md](docs/EXAMPLE_QUERIES.md) | Analytics queries |
+| [ARCHITECTURE.md](docs/architecture.md) | System architecture |
+| [DATA_DICTIONARY.md](docs/data_dictionary.md) | Data definitions |
+| [ORCHESTRATION_LOGIC.md](docs/orchestration_logic.md) | Pipeline logic |
+| [EXAMPLE_QUERIES.md](docs/example_queries.md) | Analytics queries |
 
 ---
 
@@ -352,4 +352,4 @@ MIT License - see [LICENSE](LICENSE) file.
 
 ---
 
-** If you find this project useful, please give it a star⭐!**
+#### If you find this project useful, please give it a star⭐!

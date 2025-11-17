@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS `nyc-taxi-pipeline-477912.nyc_taxi_dataset.pipeline_m
     runtime FLOAT64,                         -- Execution time in seconds
     error_message STRING                     -- Error details if failed
 )
-PARTITION BY DATE(run_timestamp)
 OPTIONS(
     description="Metadata tracking for NYC Taxi data pipeline execution history"
 );

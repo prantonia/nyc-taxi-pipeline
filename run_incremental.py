@@ -14,10 +14,6 @@ from pathlib import Path
 from src.orchestrator import PipelineOrchestrator
 from src.config import LOG_FILE, LOG_LEVEL, LOG_FORMAT
 
-# Add project root to path
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
-
 
 def setup_logging():
     """Configure logging for the pipeline."""

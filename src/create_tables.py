@@ -11,10 +11,6 @@ from pathlib import Path
 from src.orchestrator import PipelineOrchestrator
 from src.config import LOG_LEVEL, LOG_FORMAT
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
 
 def main():
     """Create all BigQuery tables."""

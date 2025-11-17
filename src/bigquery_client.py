@@ -8,7 +8,6 @@ from typing import Optional
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
 import pandas as pd
-
 from src.config import PROJECT_ID, CREDENTIALS_PATH
 
 # Setup logger
@@ -222,7 +221,7 @@ class BigQueryClient:
         try:
             where_sql = f"WHERE {where_clause}" if where_clause else ""
             query = f"""
-                SELECT 
+                SELECT
                     MIN({datetime_column}) as min_dt,
                     MAX({datetime_column}) as max_dt
                 FROM `{table_id}`

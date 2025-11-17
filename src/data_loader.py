@@ -298,7 +298,7 @@ class DataLoader:
 
             # Debug: Check datetime range
             range_query = f"""
-                SELECT 
+                SELECT
                     MIN(tpep_pickup_datetime) as min_dt,
                     MAX(tpep_pickup_datetime) as max_dt
                 FROM `{STAGING_TABLE}`

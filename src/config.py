@@ -14,9 +14,9 @@ load_dotenv()
 
 # Check if we're in test/CI mode
 IS_TEST_MODE = (
-    os.getenv('PYTEST_CURRENT_TEST') is not None 
-    or os.getenv('CI') == 'true'
-    or os.getenv('TESTING') == 'true'
+    os.getenv("PYTEST_CURRENT_TEST") is not None
+    or os.getenv("CI") == "true"
+    or os.getenv("TESTING") == "true"
 )
 
 # GCP Configuration - MUST be set in .env file (except in test mode)
@@ -34,9 +34,9 @@ if not IS_TEST_MODE:
         raise ValueError("GOOGLE_APPLICATION_CREDENTIALS must be set in .env file")
 else:
     # Set test defaults when in test mode
-    PROJECT_ID = PROJECT_ID or 'test-project-id'
-    DATASET_ID = DATASET_ID or 'test_dataset'
-    CREDENTIALS_PATH = CREDENTIALS_PATH or './test-credentials.json'
+    PROJECT_ID = PROJECT_ID or "test-project-id"
+    DATASET_ID = DATASET_ID or "test_dataset"
+    CREDENTIALS_PATH = CREDENTIALS_PATH or "./test-credentials.json"
     logger.debug("Running in TEST MODE with default test values")
 
 # Table Names - MUST be set in .env file (except in test mode)
@@ -60,11 +60,11 @@ if not IS_TEST_MODE:
         raise ValueError("METADATA_TABLE_NAME must be set in .env file")
 else:
     # Set test defaults for table names
-    STAGING_TABLE_NAME = STAGING_TABLE_NAME or 'staging_yellow_taxi'
-    RAW_TABLE_NAME = RAW_TABLE_NAME or 'raw_yellow_taxi'
-    SILVER_TABLE_NAME = SILVER_TABLE_NAME or 'silver_yellow_taxi'
-    GOLD_TABLE_NAME = GOLD_TABLE_NAME or 'gold_yellow_taxi'
-    METADATA_TABLE_NAME = METADATA_TABLE_NAME or 'pipeline_metadata'
+    STAGING_TABLE_NAME = STAGING_TABLE_NAME or "staging_yellow_taxi"
+    RAW_TABLE_NAME = RAW_TABLE_NAME or "raw_yellow_taxi"
+    SILVER_TABLE_NAME = SILVER_TABLE_NAME or "silver_yellow_taxi"
+    GOLD_TABLE_NAME = GOLD_TABLE_NAME or "gold_yellow_taxi"
+    METADATA_TABLE_NAME = METADATA_TABLE_NAME or "pipeline_metadata"
 
 # Build fully qualified table names
 STAGING_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{STAGING_TABLE_NAME}"
@@ -85,8 +85,12 @@ if not IS_TEST_MODE:
         raise ValueError("TAXI_FILE_TEMPLATE must be set in .env file")
 else:
     # Set test defaults
-    NYC_TAXI_BASE_URL = NYC_TAXI_BASE_URL or 'https://d37ci6vzurychx.cloudfront.net/trip-data'
-    TAXI_FILE_TEMPLATE = TAXI_FILE_TEMPLATE or 'yellow_tripdata_2024-{month:02d}.parquet'
+    NYC_TAXI_BASE_URL = (
+        NYC_TAXI_BASE_URL or "https://d37ci6vzurychx.cloudfront.net/trip-data"
+    )
+    TAXI_FILE_TEMPLATE = (
+        TAXI_FILE_TEMPLATE or "yellow_tripdata_2024-{month:02d}.parquet"
+    )
 
 # Year Configuration
 TARGET_YEAR = 2024
@@ -229,6 +233,6 @@ if __name__ == "__main__":
 
     try:
         validate_config()
-        logger.info("✓ Configuration is valid")
+        logger.info("Configuration is valid")
     except ValueError as e:
-        logger.error(f"✗ Configuration error: {e}")
+        logger.error(f"Configuration error: {e}")

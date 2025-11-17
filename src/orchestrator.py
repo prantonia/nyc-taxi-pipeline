@@ -5,7 +5,6 @@ Coordinates all pipeline operations across layers with idempotency checks.
 import logging
 import time
 from typing import Optional
-
 from src.bigquery_client import BigQueryClient
 from src.data_loader import DataLoader
 from src.metadata_manager import MetadataManager
@@ -229,10 +228,10 @@ class PipelineOrchestrator:
             from src.config import get_month_name
 
             month_name = get_month_name(month_to_load)
-            logger.info(f"\nProcessing: {month_name} 2024")
+            logger.info(f"Processing: {month_name} 2024")
 
             # Step 1: Load month to Staging
-            logger.info(f"\n[STEP 1/4] Loading {month_name} to Staging layer")
+            logger.info(f"[STEP 1/4] Loading {month_name} to Staging layer")
             staging_rows = self.retry_handler.retry_operation(
                 self.data_loader.load_incremental_to_staging,
                 f"Load {month_name} to Staging",
@@ -245,17 +244,17 @@ class PipelineOrchestrator:
                 logger.info(f"Loaded {staging_rows:,} rows to staging")
 
             # Step 2: Load month to Raw (with idempotency check)
-            logger.info(f"\n[STEP 2/4] Loading {month_name} to Raw layer")
+            logger.info(f"[STEP 2/4] Loading {month_name} to Raw layer")
             raw_rows = self._load_staging_to_raw_incremental(month_to_load)
 
             # Step 3: Transform to Silver
-            logger.info("\n[STEP 3/4] Transforming data to Silver layer")
+            logger.info("[STEP 3/4] Transforming data to Silver layer")
             self.retry_handler.retry_operation(
                 self._transform_to_silver, "Transform to Silver"
             )
 
             # Step 4: Aggregate to Gold
-            logger.info("\n[STEP 4/4] Aggregating data to Gold layer")
+            logger.info("[STEP 4/4] Aggregating data to Gold layer")
             self.retry_handler.retry_operation(
                 self._aggregate_to_gold, "Aggregate to Gold"
             )

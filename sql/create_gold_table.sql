@@ -65,7 +65,6 @@ hourly_stats AS (
     SELECT
         pickup_hour,
         CONCAT('Hour ', CAST(pickup_hour AS STRING), ':00') AS hour_label,
-
         COUNT(*) AS trips_per_hour,
         ROUND(AVG(trip_distance), 2) AS avg_distance,
         ROUND(AVG(total_amount), 2) AS avg_revenue,
@@ -78,14 +77,14 @@ hourly_stats AS (
 
 location_stats AS (
     SELECT
-        PULocationID AS location_id,
+        pickup_location_id AS location_id,
         COUNT(*) AS pickup_count,
         ROUND(AVG(trip_distance), 2) AS avg_trip_distance,
         ROUND(AVG(total_amount), 2) AS avg_revenue,
         ROUND(SUM(total_amount), 2) AS total_revenue_location
 
     FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.silver_yellow_taxi`
-    GROUP BY PULocationID
+    GROUP BY pickup_location_id
     HAVING COUNT(*) > 1000  -- Only significant locations
     ORDER BY pickup_count DESC
     LIMIT 100

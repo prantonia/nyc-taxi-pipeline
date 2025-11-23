@@ -7,7 +7,6 @@ Usage:
 """
 import sys
 import logging
-from pathlib import Path
 from src.orchestrator import PipelineOrchestrator
 from src.config import LOG_LEVEL, LOG_FORMAT
 

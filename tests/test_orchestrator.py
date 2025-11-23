@@ -3,24 +3,15 @@ Comprehensive tests for pipeline orchestrator.
 Tests all methods, edge cases, and integration points.
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from src.orchestrator import PipelineOrchestrator
-from src.config import (
-    STATUS_SUCCESS,
-    STATUS_FAILED,
-    STATUS_SKIPPED,
-    PIPELINE_FULL_REFRESH,
-    PIPELINE_INCREMENTAL,
-)
+from src.config import STATUS_SUCCESS, STATUS_FAILED, STATUS_SKIPPED
 
 
 class TestPipelineOrchestrator:
     """Test suite for PipelineOrchestrator class"""
 
-    # ============================================================================
     # FIXTURES - Setup code reused across tests
-    # ============================================================================
-
     @pytest.fixture
     def mock_bq_client(self):
         """Create a mock BigQuery client"""

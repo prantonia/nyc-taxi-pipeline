@@ -11,7 +11,6 @@ import logging
 from pathlib import Path
 from src.orchestrator import PipelineOrchestrator
 from src.config import LOG_FILE, LOG_LEVEL, LOG_FORMAT
-from src.retry_handler import RetryHandler
 
 
 def setup_logging():

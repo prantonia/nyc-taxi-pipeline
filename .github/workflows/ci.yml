@@ -1,24 +1,22 @@
-name: NYC Taxi Pipeline CI/CD
+name: CI - Code Quality & Tests
 
+# Trigger on push to dev/main branches and pull requests to main
 on:
   push:
     branches: [ dev, main ]
   pull_request:
     branches: [ main ]
-  schedule:
-    # Run daily at 2:00 AM UTC
-    - cron: '0 2 * * *'
-  workflow_dispatch:
 
 jobs:
   lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
@@ -35,7 +33,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install flake8 black bandit pytest-cov
+        pip install flake8==7.0.0 black==24.0.0 pytest==7.4.0 pytest-cov==4.1.0
     
     - name: Set test environment variables
       run: |
@@ -44,21 +42,27 @@ jobs:
         mkdir -p /tmp
         echo '{"type": "service_account", "project_id": "test"}' > /tmp/test-creds.json
     
-    - name: Run flake8 linting (strict)
+    - name: Run flake8 linting - Critical Errors
       run: |
+        echo " Checking for critical errors..."
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 src/ tests/ --count --max-line-length=130 --statistics --exit-zero
-      continue-on-error: true
-      
-    - name: Run pytest with coverage
+    
+    - name: Run flake8 linting - Style Check
       run: |
-        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+        echo " Checking code style..."
+        flake8 src/ tests/ --count --max-line-length=127 --statistics
       continue-on-error: true
     
     - name: Check code formatting with black
       run: |
-        black --check src/ tests/ || echo " Code formatting issues found"
+        echo " Checking code formatting..."
+        black --check src/ tests/
       continue-on-error: true
+    
+    - name: Run pytest with coverage
+      run: |
+        echo " Running tests..."
+        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
@@ -71,23 +75,24 @@ jobs:
       continue-on-error: true
 
   security-scan:
+    name: Security Scan
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
     
     - name: Install Bandit
-      run: |
-        pip install bandit[toml]
+      run: pip install bandit[toml]
     
     - name: Run Bandit security scan
       run: |
+        echo "Running security scan..."
         bandit -r src/ -ll -f screen || echo " Security issues found"
         bandit -r src/ -ll -f json -o bandit-report.json || true
       continue-on-error: true
@@ -100,16 +105,15 @@ jobs:
         path: bandit-report.json
         retention-days: 30
 
-  create-tables:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    needs: [lint-and-test, security-scan]
+  build-validation:
+    name: Build Validation
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
@@ -119,179 +123,62 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Setup Google Cloud credentials
+    - name: Verify imports
       run: |
-        echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > /tmp/gcp-key.json
-        chmod 600 /tmp/gcp-key.json
-    
-    - name: Set production environment variables
-      run: |
-        echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
-        echo "BQ_DATASET=${{ secrets.BQ_DATASET }}" >> $GITHUB_ENV
-        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
-    
-    - name: Validate environment variables
-      run: |
+        echo " Verifying all modules can be imported..."
         python -c "
-        import os
-        required_vars = [
-            'GCP_PROJECT_ID', 'BQ_DATASET', 'GOOGLE_APPLICATION_CREDENTIALS']
-        missing = [v for v in required_vars if not os.getenv(v)]
-        if missing:
-            print(f' Missing required environment variables: {missing}')
-            exit(1)
-        print(' All required environment variables are set')
+        import sys
+        try:
+            from src.config import PROJECT_ID, DATASET_ID
+            from src.bigquery_client import BigQueryClient
+            from src.data_loader import DataLoader
+            from src.metadata_manager import MetadataManager
+            from src.orchestrator import PipelineOrchestrator
+            from src.retry_handler import RetryHandler
+            print(' All imports successful')
+            sys.exit(0)
+        except Exception as e:
+            print(f'Import failed: {e}')
+            sys.exit(1)
         "
     
-    - name: Create BigQuery tables
+    - name: Validate SQL files
       run: |
-        python -m src.create_tables
-      timeout-minutes: 10
-    
-    - name: Verify table creation
-      run: |
-        python -c "
-        from src.bigquery_client import BigQueryClient
-        from src.config import (
-            STAGING_TABLE, RAW_TABLE, METADATA_TABLE
-        )
-        
-        client = BigQueryClient()
-        tables = [STAGING_TABLE, RAW_TABLE, METADATA_TABLE]
-        
-        for table in tables:
-            full_table_id = table
-            if client.table_exists(full_table_id):
-                print(f' Table {full_table_id} exists')
-            else:
-                print(f' Table {full_table_id} not found')
-                exit(1)
-        
-        print(' All required tables verified')
-        "
-    
-    - name: Cleanup credentials
-      if: always()
-      run: |
-        rm -f /tmp/gcp-key.json
-    
-    - name: Upload table creation logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: table-creation-logs
-        path: logs/
-        retention-days: 7
+        echo " Checking SQL files exist..."
+        test -f sql/create_metadata_table.sql || exit 1
+        test -f sql/create_staging_table.sql || exit 1
+        test -f sql/create_raw_table.sql || exit 1
+        test -f sql/create_silver_table.sql || exit 1
+        test -f sql/create_gold_table.sql || exit 1
+        echo " All SQL files present"
 
-  run-pipeline:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    needs: [create-tables]
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Setup Google Cloud credentials
-      run: |
-        echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > /tmp/gcp-key.json
-        chmod 600 /tmp/gcp-key.json
-    
-    - name: Set production environment variables
-      run: |
-        echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
-        echo "BQ_DATASET=${{ secrets.BQ_DATASET }}" >> $GITHUB_ENV
-        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
-    
-    - name: Pre-flight checks
-      run: |
-        python -c "
-        from src.bigquery_client import BigQueryClient
-        from src.metadata_manager import MetadataManager
-        
-        client = BigQueryClient()
-        print('BigQuery connection successful')
-        
-        metadata = MetadataManager(client)
-        print('Metadata manager initialized')
-        "
-    
-    - name: Run incremental pipeline
-      run: |
-        python run_incremental.py
-      timeout-minutes: 45
-    
-    - name: Verify pipeline execution
-      run: |
-        python -c "
-        from src.bigquery_client import BigQueryClient
-        from src.metadata_manager import MetadataManager
-        from src.config import STATUS_SUCCESS
-        
-        client = BigQueryClient()
-        metadata = MetadataManager(client)
-        last_run = metadata.get_last_successful_run('incremental')
-        
-        if not last_run:
-            print(' No successful pipeline run found (might be first run)')
-        else:
-            if last_run.get('status') == STATUS_SUCCESS:
-                print('Pipeline executed successfully')
-                print(f'Last run: {last_run.get(\"run_timestamp\")}')
-                print(f'Rows loaded: {last_run.get(\"rows_loaded\")}')
-            else:
-                print(f' Pipeline status: {last_run.get(\"status\")}')
-        "
-      continue-on-error: true
-    
-    - name: Cleanup credentials
-      if: always()
-      run: |
-        rm -f /tmp/gcp-key.json
-    
-    - name: Upload pipeline logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: pipeline-logs
-        path: logs/
-        retention-days: 30
-
-  notify:
-    needs: [lint-and-test, security-scan]
+  report-status:
+    name: CI Summary
+    needs: [lint-and-test, security-scan, build-validation]
     runs-on: ubuntu-latest
     if: always()
     
     steps:
-    - name: Report results
+    - name: Report CI Results
       run: |
-        LINT_RESULT="${{ needs.lint-and-test.result }}"
-        SECURITY_RESULT="${{ needs.security-scan.result }}"
-        
-        echo "CI/CD Results:"
-        echo "  Lint & Test: $LINT_RESULT"
-        echo "  Security Scan: $SECURITY_RESULT"
-        echo "  Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "================================================"
+        echo "          CI/CD PIPELINE RESULTS                "
+        echo "================================================"
+        echo "Lint & Test:       ${{ needs.lint-and-test.result }}"
+        echo "Security Scan:     ${{ needs.security-scan.result }}"
+        echo "Build Validation:  ${{ needs.build-validation.result }}"
+        echo "Timestamp:         $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "================================================"
         echo ""
         
-        if [ "$LINT_RESULT" == "success" ] && [ "$SECURITY_RESULT" == "success" ]; then
-          echo "All checks passed!"
-          exit 0
-        elif [ "$LINT_RESULT" == "success" ]; then
-          echo "Tests passed but security scan had issues"
+        # Check if all jobs passed
+        if [ "${{ needs.lint-and-test.result }}" == "success" ] && \
+           [ "${{ needs.security-scan.result }}" == "success" ] && \
+           [ "${{ needs.build-validation.result }}" == "success" ]; then
+          echo " All CI checks passed! Safe to merge."
           exit 0
         else
-          echo "Some checks failed"
+          echo " Some CI checks failed. Please review and fix."
           exit 1
         fi
         

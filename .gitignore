@@ -71,3 +71,9 @@ utils.py
 validate_data.py
 diagnose_tables.py
 cleanup_tables.py
+metadata_manager1.py
+metadata_managerQ.py
+orchestrator1.py
+config1.py
+setup.py
+test.txt

@@ -44,20 +44,21 @@ jobs:
     
     - name: Run flake8 linting (strict)
       run: |
+        echo "Running flake8 linting"
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 src/ tests/ --count --max-line-length=130 --statistics --exit-zero
-      continue-on-error: true
+        flake8 src/ tests/ --count --max-line-length=130 --statistics
+      continue-on-error: false
     
     - name: Check code formatting with black
       run: |
         echo " Checking code formatting..."
         black --check src/ tests/
-      continue-on-error: true
+      continue-on-error: false
     
     - name: Run pytest with coverage
       run: |
         echo " Running tests..."
-        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+        pytest src/ tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
@@ -67,7 +68,7 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
-      continue-on-error: true
+      continue-on-error: false
       
   security-scan:
     name: Security Scan

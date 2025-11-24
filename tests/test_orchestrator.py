@@ -364,9 +364,7 @@ class TestPipelineOrchestrator:
 
         assert result is None
 
-    # ============================================================================
     # CLEANUP TESTS
-    # ============================================================================
 
     def test_close(self, orchestrator, mock_bq_client):
         """Test orchestrator closes BigQuery client"""
@@ -375,9 +373,7 @@ class TestPipelineOrchestrator:
         mock_bq_client.close.assert_called_once()
 
 
-# ============================================================================
 # INTEGRATION TESTS (Higher level scenarios)
-# ============================================================================
 
 
 class TestPipelineIntegration:

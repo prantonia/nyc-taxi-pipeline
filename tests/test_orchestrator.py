@@ -70,9 +70,7 @@ class TestPipelineOrchestrator:
             orch.retry_handler = mock_retry_handler
             return orch
 
-    # ============================================================================
     # INITIALIZATION TESTS
-    # ============================================================================
 
     def test_initialization(self, orchestrator):
         """Test that orchestrator initializes with all components"""
@@ -101,9 +99,7 @@ class TestPipelineOrchestrator:
         with pytest.raises(Exception, match="SQL error"):
             orchestrator.create_tables()
 
-    # ============================================================================
     # FULL REFRESH TESTS
-    # ============================================================================
 
     def test_full_refresh_success(self, orchestrator, mock_data_loader, mock_metadata):
         """Test successful full refresh pipeline"""
@@ -177,9 +173,7 @@ class TestPipelineOrchestrator:
         call_args = mock_metadata.record_run.call_args[1]
         assert call_args["rows_loaded"] == 0
 
-    # ============================================================================
     # INCREMENTAL TESTS
-    # ============================================================================
 
     def test_incremental_success_first_month(
         self, orchestrator, mock_data_loader, mock_metadata
@@ -276,9 +270,7 @@ class TestPipelineOrchestrator:
         assert call_args["status"] == STATUS_FAILED
         assert "Network error" in call_args["error_message"]
 
-    # ============================================================================
     # INTERNAL METHOD TESTS
-    # ============================================================================
 
     def test_load_staging_to_raw_full_with_sync(self, orchestrator, mock_data_loader):
         """Test loading staging to raw when already in sync"""

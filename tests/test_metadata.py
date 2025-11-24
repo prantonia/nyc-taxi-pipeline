@@ -4,7 +4,6 @@ Tests for metadata manager module.
 import pytest
 from unittest.mock import Mock
 from datetime import datetime
-
 from src.metadata_manager import MetadataManager
 from src.config import STATUS_SUCCESS, STATUS_FAILED, STATUS_SKIPPED
 

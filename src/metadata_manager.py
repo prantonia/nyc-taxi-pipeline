@@ -5,8 +5,7 @@ Records all pipeline runs with detailed status and metrics.
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-
-from src.config1 import (
+from src.config import (
     METADATA_TABLE,
     STATUS_SUCCESS,
     STATUS_SKIPPED,

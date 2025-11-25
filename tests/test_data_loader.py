@@ -21,39 +21,38 @@ class TestDataLoaderInitialization:
 
 class TestDownloadParquet:
     """Tests for download_parquet method."""
-
+    
     def test_download_parquet_method_exists(self):
         """Test that download_parquet method exists."""
         from src.data_loader import DataLoader
-
+        
         mock_client = Mock()
         loader = DataLoader(mock_client)
-
-        assert hasattr(loader, "download_parquet")
+        
+        assert hasattr(loader, 'download_parquet')
         assert callable(loader.download_parquet)
-
-    @patch("src.data_loader.requests.get")
+    
+    @patch('src.data_loader.requests.get')
     def test_download_parquet_handles_request_errors(self, mock_get):
         """Test download handles request errors."""
         from src.data_loader import DataLoader
         import requests
-
+        
         # Test various error types
         error_types = [
             requests.exceptions.HTTPError("404"),
             requests.exceptions.ConnectionError("Network error"),
             requests.exceptions.Timeout("Timeout"),
-            requests.exceptions.RequestException("Generic error"),
+            requests.exceptions.RequestException("Generic error")
         ]
-
+        
         mock_client = Mock()
         loader = DataLoader(mock_client)
-
+        
         for error in error_types:
             mock_get.side_effect = error
             result = loader.download_parquet(1)
             assert result is None, f"Should return None for {type(error).__name__}"
-
 
 class TestCheckIfDataExists:
     """Tests for check_if_data_exists_in_staging method."""

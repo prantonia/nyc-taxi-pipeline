@@ -270,7 +270,7 @@ class PipelineOrchestrator:
                     month=month_to_load,
                     runtime=runtime,
                 )
-                logger.info("\n" + "=" * 50)
+                logger.info("=" * 50)
                 logger.info(
                     f"INCREMENTAL PIPELINE COMPLETED - SKIPPED ({month_name} already loaded)"
                 )

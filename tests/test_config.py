@@ -35,7 +35,7 @@ def sample_parquet_data():
     }
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_environment(monkeypatch):
     """Set up test environment variables"""
     monkeypatch.setenv("GCP_PROJECT_ID", "test-project")

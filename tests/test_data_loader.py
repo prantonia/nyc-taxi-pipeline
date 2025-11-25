@@ -53,7 +53,7 @@ class TestDownloadParquet:
 
         result = loader.download_parquet(1)
         
-        assert result is not None     # Should return DataFrame
+        assert result is not None
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
 

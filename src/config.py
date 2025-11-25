@@ -39,18 +39,6 @@ SILVER_TABLE_NAME = os.getenv("SILVER_TABLE_NAME")
 GOLD_TABLE_NAME = os.getenv("GOLD_TABLE_NAME")
 METADATA_TABLE_NAME = os.getenv("METADATA_TABLE_NAME")
 
-# Validate table names
-if not STAGING_TABLE_NAME:
-    raise ValueError("STAGING_TABLE_NAME must be set in .env file")
-if not RAW_TABLE_NAME:
-    raise ValueError("RAW_TABLE_NAME must be set in .env file")
-if not SILVER_TABLE_NAME:
-    raise ValueError("SILVER_TABLE_NAME must be set in .env file")
-if not GOLD_TABLE_NAME:
-    raise ValueError("GOLD_TABLE_NAME must be set in .env file")
-if not METADATA_TABLE_NAME:
-    raise ValueError("METADATA_TABLE_NAME must be set in .env file")
-
 # Build fully qualified table names
 STAGING_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{STAGING_TABLE_NAME}"
 RAW_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{RAW_TABLE_NAME}"
@@ -61,12 +49,6 @@ METADATA_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{METADATA_TABLE_NAME}"
 # Data Source Configuration
 NYC_TAXI_BASE_URL = os.getenv("NYC_TAXI_BASE_URL")
 TAXI_FILE_TEMPLATE = os.getenv("TAXI_FILE_TEMPLATE")
-
-# Validate data source configuration
-if not NYC_TAXI_BASE_URL:
-    raise ValueError("NYC_TAXI_BASE_URL must be set in .env file")
-if not TAXI_FILE_TEMPLATE:
-    raise ValueError("TAXI_FILE_TEMPLATE must be set in .env file")
 
 # Year Configuration
 TARGET_YEAR = 2024

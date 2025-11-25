@@ -12,6 +12,13 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
+# Check if we're in test/CI mode
+IS_TEST_MODE = (
+    os.getenv("PYTEST_CURRENT_TEST") is not None
+    or os.getenv("CI") == "true"
+    or os.getenv("TESTING") == "true"
+)
+
 # GCP Configuration - MUST be set in .env file
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 DATASET_ID = os.getenv("BQ_DATASET")

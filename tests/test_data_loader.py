@@ -22,25 +22,20 @@ class TestDataLoaderInitialization:
 class TestDownloadParquet:
     """Tests for download_parquet method."""
 
-    @patch("src.data_loader.io.BytesIO")
     @patch("src.data_loader.pq.read_table")
     @patch("src.data_loader.requests.get")
-    def test_download_parquet_success(self, mock_get, mock_read_table, mock_bytesio):
+    def test_download_parquet_success(self, mock_get, mock_read_table):
         """Test successful parquet file download."""
         from src.data_loader import DataLoader
 
-        # Mock HTTP response
+        # Mock successful HTTP response
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.content = b"mock_parquet_data"
-        mock_response.raise_for_status = Mock()
+        mock_response.content = b"fake_parquet_bytes"
+        mock_response.raise_for_status = Mock()  # Mock this method
         mock_get.return_value = mock_response
 
-        # Mock BytesIO
-        mock_bytesio_instance = Mock()
-        mock_bytesio.return_value = mock_bytesio_instance
-
-        # Mock PyArrow parquet read
+        # Mock PyArrow read_table to return a mock table
         mock_df = pd.DataFrame(
             {
                 "VendorID": [1, 2],
@@ -53,30 +48,56 @@ class TestDownloadParquet:
                 "total_amount": [15.0, 18.0],
             }
         )
+
         mock_table = Mock()
         mock_table.to_pandas.return_value = mock_df
         mock_read_table.return_value = mock_table
+
+        # Create loader and test
+        mock_client = Mock()
+        loader = DataLoader(mock_client)
+
+        result = loader.download_parquet(1)
+
+        # Verify it worked
+        assert result is not None, "Expected DataFrame but got None"
+        assert isinstance(
+            result, pd.DataFrame
+        ), f"Expected DataFrame, got {type(result)}"
+        assert len(result) == 2
+
+        # Verify mocks were called
+        mock_get.assert_called_once()
+        mock_read_table.assert_called_once()
+
+        # Verify the URL contains the month
+        call_args = mock_get.call_args[0][0]
+        assert "yellow_tripdata_2024-01.parquet" in call_args
+
+    @patch("src.data_loader.requests.get")
+    def test_download_parquet_handles_request_exception(self, mock_get):
+        """Test that download_parquet handles RequestException."""
+        from src.data_loader import DataLoader
+        import requests
+
+        # Mock a request exception
+        mock_get.side_effect = requests.exceptions.RequestException("Network error")
 
         mock_client = Mock()
         loader = DataLoader(mock_client)
 
         result = loader.download_parquet(1)
 
-        # Verify mocks were called
-        assert mock_get.called
-        assert mock_read_table.called
-
-        # Should return DataFrame (not None)
-        assert result is not None
-        assert isinstance(result, pd.DataFrame)
-        assert len(result) == 2
+        # Should return None on error (as per your implementation)
+        assert result is None
 
     @patch("src.data_loader.requests.get")
     def test_download_parquet_handles_http_error(self, mock_get):
-        """Test download handles HTTP errors."""
+        """Test that download_parquet handles HTTP errors."""
         from src.data_loader import DataLoader
         import requests
 
+        # Mock HTTP error
         mock_get.side_effect = requests.exceptions.HTTPError("404 Not Found")
 
         mock_client = Mock()
@@ -86,19 +107,30 @@ class TestDownloadParquet:
 
         assert result is None
 
+    @patch("src.data_loader.pq.read_table")
     @patch("src.data_loader.requests.get")
-    def test_download_parquet_handles_network_error(self, mock_get):
-        """Test download handles network errors."""
+    def test_download_parquet_handles_parquet_exception(
+        self, mock_get, mock_read_table
+    ):
+        """Test that download_parquet handles parquet reading errors."""
         from src.data_loader import DataLoader
-        import requests
 
-        mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+        # Mock successful HTTP but parquet read failure
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"invalid_parquet"
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        # Mock parquet read failure
+        mock_read_table.side_effect = Exception("Invalid parquet format")
 
         mock_client = Mock()
         loader = DataLoader(mock_client)
 
         result = loader.download_parquet(1)
 
+        # Should return None on parquet error (caught by generic except)
         assert result is None
 
 

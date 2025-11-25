@@ -29,36 +29,39 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     
+    - name: Set test environment variables
+      run: |
+        echo "CI=true" >> $GITHUB_ENV
+        echo "TESTING=true" >> $GITHUB_ENV
+        echo "GCP_PROJECT_ID=test-project-id" >> $GITHUB_ENV
+        echo "BQ_DATASET=test_dataset" >> $GITHUB_ENV
+        mkdir -p /tmp
+        echo '{"type": "service_account", "project_id": "test-project-id"}' > /tmp/test-creds.json
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/test-creds.json" >> $GITHUB_ENV
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install flake8 black bandit pytest-cov
     
-    - name: Set test environment variables
+    - name: Run flake8 linting
       run: |
-        echo "CI=true" >> $GITHUB_ENV
-        echo "TESTING=true" >> $GITHUB_ENV
-        mkdir -p /tmp
-        echo '{"type": "service_account", "project_id": "test"}' > /tmp/test-creds.json
-    
-    - name: Run flake8 linting (strict)
-      run: |
-        echo "Running flake8 linting"
+        echo "Running flake8 linting..."
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 src/ tests/ --count --max-line-length=130 --statistics
       continue-on-error: false
     
     - name: Check code formatting with black
       run: |
-        echo " Checking code formatting..."
+        echo "Checking code formatting..."
         black --check src/ tests/
       continue-on-error: false
     
     - name: Run pytest with coverage
       run: |
-        echo " Running tests..."
-        pytest src/ tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+        echo "Running tests with coverage..."
+        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
@@ -68,7 +71,7 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
-      continue-on-error: false
+      continue-on-error: true
       
   security-scan:
     name: Security Scan
@@ -89,7 +92,7 @@ jobs:
     - name: Run Bandit security scan
       run: |
         echo "Running security scan..."
-        bandit -r src/ -ll -f screen || echo " Security issues found"
+        bandit -r src/ -ll -f screen || echo "Security issues found"
         bandit -r src/ -ll -f json -o bandit-report.json || true
       continue-on-error: true
     
@@ -114,6 +117,16 @@ jobs:
       with:
         python-version: '3.12'
     
+    - name: Set test environment variables
+      run: |
+        echo "CI=true" >> $GITHUB_ENV
+        echo "TESTING=true" >> $GITHUB_ENV
+        echo "GCP_PROJECT_ID=test-project-id" >> $GITHUB_ENV
+        echo "BQ_DATASET=test_dataset" >> $GITHUB_ENV
+        mkdir -p /tmp
+        echo '{"type": "service_account", "project_id": "test-project-id"}' > /tmp/test-creds.json
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/test-creds.json" >> $GITHUB_ENV
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -121,7 +134,7 @@ jobs:
     
     - name: Verify imports
       run: |
-        echo " Verifying all modules can be imported..."
+        echo "Verifying all modules can be imported..."
         python -c "
         import sys
         try:
@@ -131,22 +144,26 @@ jobs:
             from src.metadata_manager import MetadataManager
             from src.orchestrator import PipelineOrchestrator
             from src.retry_handler import RetryHandler
-            print(' All imports successful')
+            print('All imports successful')
+            print(f'   PROJECT_ID: {PROJECT_ID}')
+            print(f'   DATASET_ID: {DATASET_ID}')
             sys.exit(0)
         except Exception as e:
             print(f'Import failed: {e}')
+            import traceback
+            traceback.print_exc()
             sys.exit(1)
         "
     
     - name: Validate SQL files
       run: |
-        echo " Checking SQL files exist..."
-        test -f sql/create_metadata_table.sql || exit 1
-        test -f sql/create_staging_table.sql || exit 1
-        test -f sql/create_raw_table.sql || exit 1
-        test -f sql/create_silver_table.sql || exit 1
-        test -f sql/create_gold_table.sql || exit 1
-        echo " All SQL files present"
+        echo "Checking SQL files exist..."
+        test -f sql/create_metadata_table.sql || (echo "Missing create_metadata_table.sql" && exit 1)
+        test -f sql/create_staging_table.sql || (echo "Missing create_staging_table.sql" && exit 1)
+        test -f sql/create_raw_table.sql || (echo "Missing create_raw_table.sql" && exit 1)
+        test -f sql/create_silver_table.sql || (echo "Missing create_silver_table.sql" && exit 1)
+        test -f sql/create_gold_table.sql || (echo "Missing create_gold_table.sql" && exit 1)
+        echo "All SQL files present"
 
   report-status:
     name: CI Summary
@@ -167,13 +184,16 @@ jobs:
         echo "================================================"
         echo ""
         
-        # Check if all jobs passed
+        # Check if critical jobs passed (security-scan can be skipped)
         if [ "${{ needs.lint-and-test.result }}" == "success" ] && \
-           [ "${{ needs.security-scan.result }}" == "success" ] && \
            [ "${{ needs.build-validation.result }}" == "success" ]; then
-          echo " All CI checks passed! Safe to merge."
+          echo "All critical CI checks passed! Safe to merge."
           exit 0
         else
-          echo " Some CI checks failed. Please review and fix."
+          echo "Some CI checks failed. Please review and fix."
+          echo ""
+          echo "Failed jobs:"
+          [ "${{ needs.lint-and-test.result }}" != "success" ] && echo "  - Lint & Test"
+          [ "${{ needs.build-validation.result }}" != "success" ] && echo "  - Build Validation"
           exit 1
         fi

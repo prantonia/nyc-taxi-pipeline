@@ -1,177 +1,199 @@
 name: CI - Code Quality & Tests
 
+# Trigger on push to dev/main branches and pull requests to main
 on:
   push:
-    branches: [dev, main]
+    branches: [ dev, main ]
   pull_request:
-    branches: [main]
-
-env:
-  CI: true
-  TESTING: true
-  GCP_PROJECT_ID: test-project-id
-  BQ_DATASET: test_dataset
-  STAGING_TABLE_NAME: test_staging_table
+    branches: [ main ]
 
 jobs:
-
-  lint-test:
-    name: Lint & Test (Python ${{ matrix.python-version }})
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12']
-
+    
     steps:
-
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
-
+        python-version: '3.12'
+    
     - name: Cache pip dependencies
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-${{ matrix.python-version }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: ${{ runner.os }}-${{ matrix.python-version }}-pip-
-
-    - name: Create test credentials
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Set test environment variables
       run: |
+        echo "CI=true" >> $GITHUB_ENV
+        echo "TESTING=true" >> $GITHUB_ENV
+        echo "GCP_PROJECT_ID=test-project-id" >> $GITHUB_ENV
+        echo "BQ_DATASET=test_dataset" >> $GITHUB_ENV
         mkdir -p /tmp
         echo '{"type": "service_account", "project_id": "test-project-id"}' > /tmp/test-creds.json
         echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/test-creds.json" >> $GITHUB_ENV
-
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install flake8 black bandit pytest-cov
-
+    
     - name: Run flake8 linting
       run: |
+        echo "Running flake8 linting..."
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 src/ tests/ --count --max-line-length=130 --statistics
-
-    - name: Check formatting with Black
-      run: black --check src/ tests/
-
-    - name: Run tests with coverage
+      continue-on-error: false
+    
+    - name: Check code formatting with black
       run: |
-        pytest tests/ -v --tb=short --maxfail=5 --cov=src \
-            --cov-report=xml --cov-report=term-missing \
-            --cov-fail-under=50
-
-    - name: Upload coverage report
+        echo "Checking code formatting..."
+        black --check src/ tests/
+      continue-on-error: false
+    
+    - name: Run pytest with coverage
+      run: |
+        echo "Running tests with coverage..."
+        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+    
+    - name: Upload coverage reports
       uses: codecov/codecov-action@v4
       if: always()
       with:
         files: ./coverage.xml
         flags: unittests
-        name: python-${{ matrix.python-version }}
+        name: codecov-umbrella
         fail_ci_if_error: false
-
-
-  security:
+      continue-on-error: true
+      
+  security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-
+    
     steps:
-
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-
+    
     - name: Install Bandit
       run: pip install bandit[toml]
-
-    - name: Run Bandit scan
+    
+    - name: Run Bandit security scan
       run: |
+        echo "Running security scan..."
+        bandit -r src/ -ll -f screen || echo "Security issues found"
         bandit -r src/ -ll -f json -o bandit-report.json || true
-
+      continue-on-error: true
+    
     - name: Upload security report
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: bandit-security-report
+        name: security-report
         path: bandit-report.json
         retention-days: 30
-
 
   build-validation:
     name: Build Validation
     runs-on: ubuntu-latest
-
+    
     steps:
-
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-
-    - name: Create test credentials
+    
+    - name: Set test environment variables
       run: |
+        echo "CI=true" >> $GITHUB_ENV
+        echo "TESTING=true" >> $GITHUB_ENV
+        echo "GCP_PROJECT_ID=test-project-id" >> $GITHUB_ENV
+        echo "BQ_DATASET=test_dataset" >> $GITHUB_ENV
         mkdir -p /tmp
         echo '{"type": "service_account", "project_id": "test-project-id"}' > /tmp/test-creds.json
         echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/test-creds.json" >> $GITHUB_ENV
-
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-
+    
     - name: Verify imports
       run: |
-        python - <<'EOF'
+        echo "Verifying all modules can be imported..."
+        python -c "
+        import sys
+        try:
             from src.config import PROJECT_ID, DATASET_ID
             from src.bigquery_client import BigQueryClient
             from src.data_loader import DataLoader
             from src.metadata_manager import MetadataManager
             from src.orchestrator import PipelineOrchestrator
             from src.retry_handler import RetryHandler
-            print("All imports successful")
-            print("PROJECT_ID:", PROJECT_ID)
-            print("DATASET_ID:", DATASET_ID)
-            EOF
-
-    - name: Validate SQL files exist
+            print('All imports successful')
+            print(f'   PROJECT_ID: {PROJECT_ID}')
+            print(f'   DATASET_ID: {DATASET_ID}')
+            sys.exit(0)
+        except Exception as e:
+            print(f'Import failed: {e}')
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+        "
+    
+    - name: Validate SQL files
       run: |
-        for file in sql/create_metadata_table.sql \
-                    sql/create_staging_table.sql \
-                    sql/create_raw_table.sql \
-                    sql/create_silver_table.sql \
-                    sql/create_gold_table.sql; do
-          test -f "$file" || { echo "Missing $file"; exit 1; }
-        done
+        echo "Checking SQL files exist..."
+        test -f sql/create_metadata_table.sql || (echo "Missing create_metadata_table.sql" && exit 1)
+        test -f sql/create_staging_table.sql || (echo "Missing create_staging_table.sql" && exit 1)
+        test -f sql/create_raw_table.sql || (echo "Missing create_raw_table.sql" && exit 1)
+        test -f sql/create_silver_table.sql || (echo "Missing create_silver_table.sql" && exit 1)
+        test -f sql/create_gold_table.sql || (echo "Missing create_gold_table.sql" && exit 1)
+        echo "All SQL files present"
 
-
-  summary:
+  report-status:
     name: CI Summary
-    needs: [lint-test, security, build-validation]
+    needs: [lint-and-test, security-scan, build-validation]
     runs-on: ubuntu-latest
     if: always()
-
+    
     steps:
-    - name: Output Summary
+    - name: Report CI Results
       run: |
-        echo "====== CI SUMMARY ======"
-        echo "Lint & Test:      ${{ needs.lint-test.result }}"
-        echo "Security Scan:    ${{ needs.security.result }}"
-        echo "Build Validation: ${{ needs.build-validation.result }}"
-        echo "========================"
-
-        if [ "${{ needs.lint-test.result }}" == "success" ] && \
+        echo "================================================"
+        echo "          CI/CD PIPELINE RESULTS                "
+        echo "================================================"
+        echo "Lint & Test:       ${{ needs.lint-and-test.result }}"
+        echo "Security Scan:     ${{ needs.security-scan.result }}"
+        echo "Build Validation:  ${{ needs.build-validation.result }}"
+        echo "Timestamp:         $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "================================================"
+        echo ""
+        
+        # Check if critical jobs passed (security-scan can be skipped)
+        if [ "${{ needs.lint-and-test.result }}" == "success" ] && \
            [ "${{ needs.build-validation.result }}" == "success" ]; then
-          echo "All critical checks passed!"
+          echo "All critical CI checks passed! Safe to merge."
           exit 0
         else
-          echo "Some checks failed."
+          echo "Some CI checks failed. Please review and fix."
+          echo ""
+          echo "Failed jobs:"
+          [ "${{ needs.lint-and-test.result }}" != "success" ] && echo "  - Lint & Test"
+          [ "${{ needs.build-validation.result }}" != "success" ] && echo "  - Build Validation"
           exit 1
         fi

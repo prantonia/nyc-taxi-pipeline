@@ -53,6 +53,7 @@ class TestDownloadParquet:
             mock_get.side_effect = error
             result = loader.download_parquet(1)
             assert result is None, f"Should return None for {type(error).__name__}"
+            
 
 class TestCheckIfDataExists:
     """Tests for check_if_data_exists_in_staging method."""
@@ -380,6 +381,7 @@ class TestIntegrationConcepts:
         assert hasattr(loader, "load_incremental_to_staging")
         assert hasattr(loader, "load_to_staging")
         assert hasattr(loader, "check_if_data_exists_in_staging")
+        
         assert hasattr(loader, "should_load_to_raw")
         assert hasattr(loader, "download_all_months")
         assert hasattr(loader, "is_staging_empty")

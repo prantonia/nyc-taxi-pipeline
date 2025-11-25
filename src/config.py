@@ -12,24 +12,37 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Check if we're in test/CI mode
-IS_TEST_MODE = (
-    os.getenv("PYTEST_CURRENT_TEST") is not None
-    or os.getenv("CI") == "true"
-    or os.getenv("TESTING") == "true"
-)
-
-# GCP Configuration - MUST be set in .env file (except in test mode)
+# GCP Configuration - MUST be set in .env file
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 DATASET_ID = os.getenv("BQ_DATASET")
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
-# Table Names - MUST be set in .env file (except in test mode)
+# Validate required environment variables
+if not PROJECT_ID:
+    raise ValueError("GCP_PROJECT_ID must be set in .env file")
+if not DATASET_ID:
+    raise ValueError("BQ_DATASET must be set in .env file")
+if not CREDENTIALS_PATH:
+    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS must be set in .env file")
+
+# Table Names - MUST be set in .env file
 STAGING_TABLE_NAME = os.getenv("STAGING_TABLE_NAME")
 RAW_TABLE_NAME = os.getenv("RAW_TABLE_NAME")
 SILVER_TABLE_NAME = os.getenv("SILVER_TABLE_NAME")
 GOLD_TABLE_NAME = os.getenv("GOLD_TABLE_NAME")
 METADATA_TABLE_NAME = os.getenv("METADATA_TABLE_NAME")
+
+# Validate table names
+if not STAGING_TABLE_NAME:
+    raise ValueError("STAGING_TABLE_NAME must be set in .env file")
+if not RAW_TABLE_NAME:
+    raise ValueError("RAW_TABLE_NAME must be set in .env file")
+if not SILVER_TABLE_NAME:
+    raise ValueError("SILVER_TABLE_NAME must be set in .env file")
+if not GOLD_TABLE_NAME:
+    raise ValueError("GOLD_TABLE_NAME must be set in .env file")
+if not METADATA_TABLE_NAME:
+    raise ValueError("METADATA_TABLE_NAME must be set in .env file")
 
 # Build fully qualified table names
 STAGING_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{STAGING_TABLE_NAME}"
@@ -42,6 +55,12 @@ METADATA_TABLE = f"{PROJECT_ID}.{DATASET_ID}.{METADATA_TABLE_NAME}"
 NYC_TAXI_BASE_URL = os.getenv("NYC_TAXI_BASE_URL")
 TAXI_FILE_TEMPLATE = os.getenv("TAXI_FILE_TEMPLATE")
 
+# Validate data source configuration
+if not NYC_TAXI_BASE_URL:
+    raise ValueError("NYC_TAXI_BASE_URL must be set in .env file")
+if not TAXI_FILE_TEMPLATE:
+    raise ValueError("TAXI_FILE_TEMPLATE must be set in .env file")
+
 # Year Configuration
 TARGET_YEAR = 2024
 MONTHS = list(range(1, 13))  # 1 to 12
@@ -49,8 +68,7 @@ MONTHS = list(range(1, 13))  # 1 to 12
 # Logging Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FILE = os.getenv("LOG_FILE", "logs/pipeline.log")
-LOG_FORMAT = "%(asctime)s | %(levelname)s | %(module)s | %(message)s"
-
+LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 
 # Retry Configuration
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
@@ -111,7 +129,7 @@ def get_date_range_string(month: int = None) -> str:
         Date range string (e.g., "2024-01-01 to 2024-01-31" or "2024-01-01 - 2024-12-31")
     """
     if month is None:
-        return f"{TARGET_YEAR}-01-01 to {TARGET_YEAR}-12-31"
+        return f"{TARGET_YEAR}-01-01 - {TARGET_YEAR}-12-31"
 
     # Calculate last day of month
     if month == 12:
@@ -170,7 +188,6 @@ if __name__ == "__main__":
 
     logger.info("NYC Taxi Pipeline Configuration")
     logger.info("=" * 50)
-    logger.info(f"Test Mode: {IS_TEST_MODE}")
     logger.info(f"Project ID: {PROJECT_ID}")
     logger.info(f"Dataset ID: {DATASET_ID}")
     logger.info(f"Staging Table: {STAGING_TABLE}")

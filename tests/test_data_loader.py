@@ -51,8 +51,9 @@ class TestDownloadParquet:
         mock_client = Mock()
         loader = DataLoader(mock_client)
 
-        result = loader.download_parquet(1)    # Should return DataFrame
-        assert result is not None
+        result = loader.download_parquet(1)  
+        
+        assert result is not None     # Should return DataFrame
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
 

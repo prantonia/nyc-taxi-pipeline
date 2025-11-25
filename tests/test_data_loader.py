@@ -53,10 +53,11 @@ class TestDownloadParquet:
 
         result = loader.download_parquet(1)
         
+        # Should return DataFrame
         assert result is not None
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
-
+        
     @patch("src.data_loader.requests.get")
     def test_download_parquet_handles_errors(self, mock_get):
         """Test download handles errors gracefully."""

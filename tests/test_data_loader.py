@@ -1,6 +1,5 @@
 """
 Tests for data loader module.
-Tests downloading, uploading, and idempotency checking.
 """
 from unittest.mock import Mock, patch
 import pandas as pd
@@ -23,9 +22,9 @@ class TestDataLoaderInitialization:
 class TestDownloadParquet:
     """Tests for download_parquet method."""
 
-    @patch("src.data_loader.requests.get")
     @patch("src.data_loader.pq.read_table")
-    def test_download_parquet_success(self, mock_read_table, mock_get):
+    @patch("src.data_loader.requests.get")
+    def test_download_parquet_success(self, mock_get, mock_read_table):
         """Test successful parquet file download."""
         from src.data_loader import DataLoader
 
@@ -33,7 +32,6 @@ class TestDownloadParquet:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.content = b"mock_parquet_data"
-        mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
         # Mock PyArrow parquet read
@@ -41,7 +39,12 @@ class TestDownloadParquet:
             {
                 "VendorID": [1, 2],
                 "tpep_pickup_datetime": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "tpep_dropoff_datetime": [
+                    datetime(2024, 1, 1, 0, 30),
+                    datetime(2024, 1, 2, 0, 30),
+                ],
                 "trip_distance": [2.5, 3.0],
+                "total_amount": [15.0, 18.0],
             }
         )
         mock_table = Mock()
@@ -53,7 +56,7 @@ class TestDownloadParquet:
 
         result = loader.download_parquet(1)
 
-        # Should return DataFrame
+        # Should return DataFrame (not None)
         assert result is not None
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
@@ -82,7 +85,6 @@ class TestCheckIfDataExists:
         """Test checking when data doesn't exist."""
         from src.data_loader import DataLoader
 
-        # Create test DataFrame
         mock_df = pd.DataFrame(
             {
                 "tpep_pickup_datetime": [datetime(2024, 1, 1, 10, 0)],
@@ -94,7 +96,6 @@ class TestCheckIfDataExists:
         )
 
         mock_client = Mock()
-        # Mock that rows don't exist in staging
         mock_client.execute_query.return_value = [Mock(count=0)]
 
         loader = DataLoader(mock_client)
@@ -123,11 +124,7 @@ class TestCheckIfDataExists:
         )
 
         mock_client = Mock()
-        # Mock that both boundary rows exist
-        mock_client.execute_query.side_effect = [
-            [Mock(count=1)],  # Min row exists
-            [Mock(count=1)],  # Max row exists
-        ]
+        mock_client.execute_query.side_effect = [[Mock(count=1)], [Mock(count=1)]]
 
         loader = DataLoader(mock_client)
         result = loader.check_if_data_exists_in_staging(mock_df)
@@ -157,7 +154,6 @@ class TestLoadToStaging:
 
         rows_loaded = loader.load_to_staging(df)
 
-        # Verify load was called
         mock_client.load_dataframe_to_table.assert_called_once()
         assert rows_loaded == 100
 
@@ -168,7 +164,7 @@ class TestShouldLoadToRaw:
     @patch("src.data_loader.DataLoader.get_raw_row_count")
     @patch("src.data_loader.DataLoader.get_staging_row_count_2024")
     def test_should_load_when_counts_differ(self, mock_staging_count, mock_raw_count):
-        """Test should load when staging and raw have different counts."""
+        """Test should load when counts differ."""
         from src.data_loader import DataLoader
 
         mock_staging_count.return_value = 1000000
@@ -212,7 +208,6 @@ class TestLoadIncrementalToStaging:
         """Test loading new month data."""
         from src.data_loader import DataLoader
 
-        # Mock download returns DataFrame
         mock_df = pd.DataFrame(
             {
                 "VendorID": [1] * 100,
@@ -223,11 +218,7 @@ class TestLoadIncrementalToStaging:
             }
         )
         mock_download.return_value = mock_df
-
-        # Data doesn't exist
         mock_check_exists.return_value = False
-
-        # Mock load returns row count
         mock_load_staging.return_value = 100
 
         mock_client = Mock()
@@ -235,13 +226,8 @@ class TestLoadIncrementalToStaging:
 
         rows_loaded = loader.load_incremental_to_staging(1)
 
-        # Verify download was called
         mock_download.assert_called_once_with(1)
-
-        # Verify load was called
         mock_load_staging.assert_called_once()
-
-        # Should return 100 rows
         assert rows_loaded == 100
 
     @patch("src.data_loader.DataLoader.check_if_data_exists_in_staging")
@@ -250,7 +236,6 @@ class TestLoadIncrementalToStaging:
         """Test when data already exists (skip load)."""
         from src.data_loader import DataLoader
 
-        # Mock download returns DataFrame
         mock_df = pd.DataFrame(
             {
                 "VendorID": [1] * 100,
@@ -261,8 +246,6 @@ class TestLoadIncrementalToStaging:
             }
         )
         mock_download.return_value = mock_df
-
-        # Data already exists
         mock_check_exists.return_value = True
 
         mock_client = Mock()
@@ -270,7 +253,6 @@ class TestLoadIncrementalToStaging:
 
         rows_loaded = loader.load_incremental_to_staging(1)
 
-        # Should return 0 when data exists
         assert rows_loaded == 0
 
 
@@ -286,7 +268,6 @@ class TestDownloadAllMonths:
         """Test downloading all 12 months."""
         from src.data_loader import DataLoader
 
-        # Mock download returns DataFrame for each month
         def create_mock_df(month):
             return pd.DataFrame(
                 {
@@ -299,13 +280,8 @@ class TestDownloadAllMonths:
                 }
             )
 
-        # Return different DataFrames for each month
         mock_download.side_effect = [create_mock_df(i) for i in range(1, 13)]
-
-        # Data doesn't exist for any month
         mock_check_exists.return_value = False
-
-        # Mock load returns row count
         mock_load_staging.return_value = 1000000
 
         mock_client = Mock()
@@ -313,13 +289,8 @@ class TestDownloadAllMonths:
 
         total_rows = loader.download_all_months()
 
-        # Should call download 12 times
         assert mock_download.call_count == 12
-
-        # Should call load 12 times
         assert mock_load_staging.call_count == 12
-
-        # Total should be 12 million
         assert total_rows == 12000000
 
     @patch("src.data_loader.DataLoader.load_to_staging")
@@ -331,7 +302,6 @@ class TestDownloadAllMonths:
         """Test when some months already exist."""
         from src.data_loader import DataLoader
 
-        # Mock download returns DataFrame for each month
         def create_mock_df(month):
             return pd.DataFrame(
                 {
@@ -345,12 +315,8 @@ class TestDownloadAllMonths:
             )
 
         mock_download.side_effect = [create_mock_df(i) for i in range(1, 13)]
-
-        # First 3 months exist, rest don't
         check_results = [True, True, True] + [False] * 9
         mock_check_exists.side_effect = check_results
-
-        # Mock load returns row count
         mock_load_staging.return_value = 1000000
 
         mock_client = Mock()
@@ -358,16 +324,9 @@ class TestDownloadAllMonths:
 
         total_rows = loader.download_all_months()
 
-        # Should call download 12 times
         assert mock_download.call_count == 12
-
-        # Should call check 12 times
         assert mock_check_exists.call_count == 12
-
-        # Should only call load 9 times (3 skipped)
         assert mock_load_staging.call_count == 9
-
-        # Total should be 9 million (3 months skipped)
         assert total_rows == 9000000
 
 
@@ -379,16 +338,13 @@ class TestGetRowCounts:
         from src.data_loader import DataLoader
 
         mock_client = Mock()
-
-        # Mock the queries
-        mock_client.get_row_count.side_effect = [1000000, 950000]  # total, 2024
+        mock_client.get_row_count.side_effect = [1000000, 950000]
         mock_client.execute_query.side_effect = [
-            [Mock(null_count=0)],  # null check
-            [Mock(min_dt=datetime(2024, 1, 1), max_dt=datetime(2024, 12, 31))],  # range
+            [Mock(null_count=0)],
+            [Mock(min_dt=datetime(2024, 1, 1), max_dt=datetime(2024, 12, 31))],
         ]
 
         loader = DataLoader(mock_client)
-
         count = loader.get_staging_row_count_2024()
 
         assert count == 950000
@@ -401,7 +357,6 @@ class TestGetRowCounts:
         mock_client.get_row_count.return_value = 800000
 
         loader = DataLoader(mock_client)
-
         count = loader.get_raw_row_count()
 
         assert count == 800000
@@ -418,7 +373,6 @@ class TestIsStagingEmpty:
         mock_client.get_row_count.return_value = 0
 
         loader = DataLoader(mock_client)
-
         result = loader.is_staging_empty()
 
         assert result is True
@@ -431,7 +385,6 @@ class TestIsStagingEmpty:
         mock_client.get_row_count.return_value = 1000000
 
         loader = DataLoader(mock_client)
-
         result = loader.is_staging_empty()
 
         assert result is False
@@ -447,7 +400,6 @@ class TestIntegrationConcepts:
         mock_client = Mock()
         loader = DataLoader(mock_client)
 
-        # Verify key methods exist
         assert hasattr(loader, "download_parquet")
         assert hasattr(loader, "load_incremental_to_staging")
         assert hasattr(loader, "load_to_staging")

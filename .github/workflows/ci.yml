@@ -28,6 +28,12 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 black bandit pytest-cov
     
     - name: Set test environment variables
       run: |
@@ -35,12 +41,6 @@ jobs:
         echo "TESTING=true" >> $GITHUB_ENV
         mkdir -p /tmp
         echo '{"type": "service_account", "project_id": "test"}' > /tmp/test-creds.json
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install flake8 black bandit pytest-cov
     
     - name: Run flake8 linting
       run: |
@@ -149,6 +149,17 @@ jobs:
             exit(1)
         print(' All required environment variables are set')
         "
+    - name: Verify imports
+      run: |
+        python -c "
+        from src.config import PROJECT_ID, DATASET_ID
+        from src.bigquery_client import BigQueryClient
+        from src.data_loader import DataLoader
+        from src.metadata_manager import MetadataManager
+        from src.orchestrator import PipelineOrchestrator
+        from src.retry_handler import RetryHandler
+        print('All imports successful')
+        "   
     
     - name: Validate SQL files
       run: |

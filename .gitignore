@@ -77,3 +77,9 @@ orchestrator1.py
 config1.py
 setup.py
 test.txt
+
+# Coverage reports
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*

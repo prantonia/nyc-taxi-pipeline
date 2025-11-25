@@ -28,22 +28,54 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
-    
-    - name: Set test environment variables
-      run: |
-        echo "CI=true" >> $GITHUB_ENV
-        echo "TESTING=true" >> $GITHUB_ENV
-        echo "GCP_PROJECT_ID=test-project-id" >> $GITHUB_ENV
-        echo "BQ_DATASET=test_dataset" >> $GITHUB_ENV
-        mkdir -p /tmp
-        echo '{"type": "service_account", "project_id": "test-project-id"}' > /tmp/test-creds.json
-        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/test-creds.json" >> $GITHUB_ENV
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install flake8 black bandit pytest-cov
+    
+    - name: Set test environment variables
+      run: |
+        echo "CI=true" >> $GITHUB_ENV
+        echo "TESTING=true" >> $GITHUB_ENV
+        mkdir -p /tmp
+        echo '{"type": "service_account", "project_id": "test"}' > /tmp/test-creds.json
+
+    - name: Setup Google Cloud credentials
+      run: |
+        echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > /tmp/gcp-key.json
+        chmod 600 /tmp/gcp-key.json
+    
+    - name: Set production environment variables
+      run: |
+        echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+        echo "BQ_DATASET=${{ secrets.BQ_DATASET }}" >> $GITHUB_ENV
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
+    
+    - name: Validate environment variables
+      run: |
+        python -c "
+        import os
+        required_vars = [
+            'GCP_PROJECT_ID', 'BQ_DATASET', 'GOOGLE_APPLICATION_CREDENTIALS']
+        missing = [v for v in required_vars if not os.getenv(v)]
+        if missing:
+            print(f' Missing required environment variables: {missing}')
+            exit(1)
+        print(' All required environment variables are set')
+        "
+    - name: Verify imports
+      run: |
+        python -c "
+        from src.config import PROJECT_ID, DATASET_ID
+        from src.bigquery_client import BigQueryClient
+        from src.data_loader import DataLoader
+        from src.metadata_manager import MetadataManager
+        from src.orchestrator import PipelineOrchestrator
+        from src.retry_handler import RetryHandler
+        print('All imports successful')
+        "       
     
     - name: Run flake8 linting
       run: |
@@ -121,39 +153,48 @@ jobs:
       run: |
         echo "CI=true" >> $GITHUB_ENV
         echo "TESTING=true" >> $GITHUB_ENV
-        echo "GCP_PROJECT_ID=test-project-id" >> $GITHUB_ENV
-        echo "BQ_DATASET=test_dataset" >> $GITHUB_ENV
         mkdir -p /tmp
-        echo '{"type": "service_account", "project_id": "test-project-id"}' > /tmp/test-creds.json
-        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/test-creds.json" >> $GITHUB_ENV
+        echo '{"type": "service_account", "project_id": "test"}' > /tmp/test-creds.json
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
+    - name: Setup Google Cloud credentials
+      run: |
+        echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > /tmp/gcp-key.json
+        chmod 600 /tmp/gcp-key.json
+    
+    - name: Set production environment variables
+      run: |
+        echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+        echo "BQ_DATASET=${{ secrets.BQ_DATASET }}" >> $GITHUB_ENV
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
+    
+    - name: Validate environment variables
+      run: |
+        python -c "
+        import os
+        required_vars = [
+            'GCP_PROJECT_ID', 'BQ_DATASET', 'GOOGLE_APPLICATION_CREDENTIALS']
+        missing = [v for v in required_vars if not os.getenv(v)]
+        if missing:
+            print(f' Missing required environment variables: {missing}')
+            exit(1)
+        print(' All required environment variables are set')
+        "
     - name: Verify imports
       run: |
-        echo "Verifying all modules can be imported..."
         python -c "
-        import sys
-        try:
-            from src.config import PROJECT_ID, DATASET_ID
-            from src.bigquery_client import BigQueryClient
-            from src.data_loader import DataLoader
-            from src.metadata_manager import MetadataManager
-            from src.orchestrator import PipelineOrchestrator
-            from src.retry_handler import RetryHandler
-            print('All imports successful')
-            print(f'   PROJECT_ID: {PROJECT_ID}')
-            print(f'   DATASET_ID: {DATASET_ID}')
-            sys.exit(0)
-        except Exception as e:
-            print(f'Import failed: {e}')
-            import traceback
-            traceback.print_exc()
-            sys.exit(1)
-        "
+        from src.config import PROJECT_ID, DATASET_ID
+        from src.bigquery_client import BigQueryClient
+        from src.data_loader import DataLoader
+        from src.metadata_manager import MetadataManager
+        from src.orchestrator import PipelineOrchestrator
+        from src.retry_handler import RetryHandler
+        print('All imports successful')
+        "   
     
     - name: Validate SQL files
       run: |

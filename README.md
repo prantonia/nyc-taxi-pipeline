@@ -21,9 +21,6 @@ A production-grade data engineering pipeline for processing NYC Taxi trip data u
 - [Testing](#testing)
 - [CI/CD](#cicd)
 - [Documentation](#documentation)
-- [Performance](#performance)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -52,40 +49,7 @@ A production-grade data engineering pipeline for processing NYC Taxi trip data u
 
 ## **Architecture**
 
-```
-┌─────────────────┐
-│   Data Source   │  NYC TLC Trip Data (Parquet)
-└────────┬────────┘
-         │ Download
-         ▼
-┌─────────────────┐
-│  Staging Layer  │  Raw data as-is from source
-│    (Bronze)     │  - Partitioned by source_month
-└────────┬────────┘  - Includes data infiltrations
-         │ Filter 2024
-         ▼
-┌─────────────────┐
-│   Raw Layer     │  Validated 2024 data only
-│    (Bronze)     │  - Removes infiltrations
-└────────┬────────┘  - CREATE OR REPLACE pattern
-         │ Transform
-         ▼
-┌─────────────────┐
-│  Silver Layer   │  Cleaned and standardized
-│    (Silver)     │  - Renamed columns
-└────────┬────────┘  - Data quality rules
-         │ Aggregate
-         ▼
-┌─────────────────┐
-│   Gold Layer    │  Business-ready aggregations
-│     (Gold)      │  - Daily metrics
-└─────────────────┘  - Payment analysis
-         │
-         ▼
-    ┌─────────┐
-    │Analytics│  Ready for BI tools
-    └─────────┘
-```
+![Pipeline Architecture](assets/NYCPipeline.svg)
 
 **Key Components:**
 - **Python Orchestrator** - Coordinates all pipeline operations
@@ -93,15 +57,12 @@ A production-grade data engineering pipeline for processing NYC Taxi trip data u
 - **Data Loader** - Downloads and loads data with PyArrow
 - **Metadata Manager** - Tracks pipeline execution history
 - **Retry Handler** - Implements exponential backoff logic
-
-See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
-
 ---
 
 ## **Quick Start**
 
 ### **Prerequisites**
-- Python 3.11+
+- Python 3.12
 - Google Cloud Platform account
 - BigQuery dataset created
 - Service account with BigQuery permissions
@@ -287,12 +248,10 @@ nyc-taxi-pipeline/
 
 ## **Pipeline Modes**
 
-| Mode | Use Case | Duration | Cost |
-|------|----------|----------|------|
-| **Full Refresh** | Initial load, complete refresh | ~20 min | ~$5 |
-| **Incremental** | Add new months, regular updates | ~5 min | ~$5/month |
-
-See [docs/full_vs_incremental.md](docs/full_vs_incremental.md) for details.
+| Mode | Use Case | Duration |
+|------|----------|----------|
+| **Full Refresh** | Initial load, complete refresh | ~20 min |
+| **Incremental** | Add new months, regular updates | ~5 min |
 
 ---
 
@@ -319,7 +278,7 @@ Automated checks on every push:
 - Code coverage
 - Code formatting (black)
 
-See [docs/ci_cd_setup.md](docs/ci_cd_setup.md) for details.
+See [Project_documentation](docs/project_documentation.md) for details.
 
 ---
 
@@ -327,22 +286,8 @@ See [docs/ci_cd_setup.md](docs/ci_cd_setup.md) for details.
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](docs/architecture.md) | System architecture |
-| [DATA_DICTIONARY.md](docs/data_dictionary.md) | Data definitions |
-| [ORCHESTRATION_LOGIC.md](docs/orchestration_logic.md) | Pipeline logic |
-| [EXAMPLE_QUERIES.md](docs/example_queries.md) | Analytics queries |
-
----
-
-## **Contributing**
-
-Contributions welcome! See contribution guidelines above.
-
----
-
-## **License**
-
-MIT License - see [LICENSE](LICENSE) file.
+| [project_documentation](docs/project_documentation.md) | Detailed Project Documentation |
+| [data_dictionary](docs/data_dictionary.md) | Data definitions |
 
 ---
 

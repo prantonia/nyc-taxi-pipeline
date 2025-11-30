@@ -7,7 +7,7 @@ on:
     branches: [ main ]
   schedule:
     # Run daily 
-    - cron: '35 20 * * *'
+    - cron: '30 8 * * *'
   workflow_dispatch:
 
 jobs:
@@ -171,6 +171,14 @@ jobs:
       if: always()
       run: |
         rm -f /tmp/gcp-key.json
+    
+    - name: Upload table creation logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: table-creation-logs
+        path: logs/
+        retention-days: 7
 
   run-pipeline:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

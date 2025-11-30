@@ -6,19 +6,20 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    # Run daily at 2:00 AM UTC
-    - cron: '0 2 * * *'
+    # Run daily 
+    - cron: '0 13 * * *'
   workflow_dispatch:
 
 jobs:
   lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
@@ -30,7 +31,7 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -43,65 +44,60 @@ jobs:
         echo "TESTING=true" >> $GITHUB_ENV
         mkdir -p /tmp
         echo '{"type": "service_account", "project_id": "test"}' > /tmp/test-creds.json
+
+    - name: Setup Google Cloud credentials
+      run: |
+        echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > /tmp/gcp-key.json
+        chmod 600 /tmp/gcp-key.json
     
-    - name: Run flake8 linting (strict)
+    - name: Set production environment variables
       run: |
+        echo "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+        echo "BQ_DATASET=${{ secrets.BQ_DATASET }}" >> $GITHUB_ENV
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
+            
+    - name: Run flake8 linting
+      run: |
+        echo "Running flake8 linting..."
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 src/ tests/ --count --max-line-length=130 --statistics --exit-zero
-      continue-on-error: true
-      
-    - name: Run pytest with coverage
-      run: |
-        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50
-      continue-on-error: true
+        flake8 src/ tests/ --count --max-line-length=130 --statistics
+      continue-on-error: false
     
     - name: Check code formatting with black
       run: |
-        black --check src/ tests/ || echo " Code formatting issues found"
-      continue-on-error: true
+        echo "Checking code formatting..."
+        black --check src/ tests/
+      continue-on-error: false
     
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
-      if: always()
-      with:
-        files: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-      continue-on-error: true
-
+    - name: Run pytest with coverage
+      run: |
+        echo "Running tests with coverage..."
+        pytest tests/ -v --tb=short --maxfail=5 --cov=src --cov-report=term-missing --cov-fail-under=50
+      
   security-scan:
+    name: Security Scan
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
     
     - name: Install Bandit
-      run: |
-        pip install bandit[toml]
+      run: pip install bandit[toml]
     
     - name: Run Bandit security scan
       run: |
-        bandit -r src/ -ll -f screen || echo " Security issues found"
+        echo "Running security scan..."
+        bandit -r src/ -ll -f screen || echo "Security issues found"
         bandit -r src/ -ll -f json -o bandit-report.json || true
       continue-on-error: true
     
-    - name: Upload security report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-report
-        path: bandit-report.json
-        retention-days: 30
-
   create-tables:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: [lint-and-test, security-scan]
     runs-on: ubuntu-latest
     
@@ -294,4 +290,3 @@ jobs:
           echo "Some checks failed"
           exit 1
         fi
-        

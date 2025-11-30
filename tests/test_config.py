@@ -5,6 +5,7 @@ Provides common mocks and test data.
 import pytest
 from unittest.mock import MagicMock
 
+
 @pytest.fixture
 def mock_bigquery_client():
     """Shared BigQuery client mock"""
@@ -34,7 +35,7 @@ def sample_parquet_data():
     }
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_environment(monkeypatch):
     """Set up test environment variables"""
     monkeypatch.setenv("GCP_PROJECT_ID", "test-project")

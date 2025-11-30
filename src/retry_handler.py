@@ -199,7 +199,7 @@ if __name__ == "__main__":
     # Test retry handler
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
     )
 
     # Test 1: Successful operation on first try

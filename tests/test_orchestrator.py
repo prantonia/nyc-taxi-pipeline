@@ -3,24 +3,15 @@ Comprehensive tests for pipeline orchestrator.
 Tests all methods, edge cases, and integration points.
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from src.orchestrator import PipelineOrchestrator
-from src.config import (
-    STATUS_SUCCESS,
-    STATUS_FAILED,
-    STATUS_SKIPPED,
-    PIPELINE_FULL_REFRESH,
-    PIPELINE_INCREMENTAL,
-)
+from src.config import STATUS_SUCCESS, STATUS_FAILED, STATUS_SKIPPED
 
 
 class TestPipelineOrchestrator:
     """Test suite for PipelineOrchestrator class"""
 
-    # ============================================================================
     # FIXTURES - Setup code reused across tests
-    # ============================================================================
-
     @pytest.fixture
     def mock_bq_client(self):
         """Create a mock BigQuery client"""
@@ -79,9 +70,7 @@ class TestPipelineOrchestrator:
             orch.retry_handler = mock_retry_handler
             return orch
 
-    # ============================================================================
     # INITIALIZATION TESTS
-    # ============================================================================
 
     def test_initialization(self, orchestrator):
         """Test that orchestrator initializes with all components"""
@@ -110,9 +99,7 @@ class TestPipelineOrchestrator:
         with pytest.raises(Exception, match="SQL error"):
             orchestrator.create_tables()
 
-    # ============================================================================
     # FULL REFRESH TESTS
-    # ============================================================================
 
     def test_full_refresh_success(self, orchestrator, mock_data_loader, mock_metadata):
         """Test successful full refresh pipeline"""
@@ -186,9 +173,7 @@ class TestPipelineOrchestrator:
         call_args = mock_metadata.record_run.call_args[1]
         assert call_args["rows_loaded"] == 0
 
-    # ============================================================================
     # INCREMENTAL TESTS
-    # ============================================================================
 
     def test_incremental_success_first_month(
         self, orchestrator, mock_data_loader, mock_metadata
@@ -285,9 +270,7 @@ class TestPipelineOrchestrator:
         assert call_args["status"] == STATUS_FAILED
         assert "Network error" in call_args["error_message"]
 
-    # ============================================================================
     # INTERNAL METHOD TESTS
-    # ============================================================================
 
     def test_load_staging_to_raw_full_with_sync(self, orchestrator, mock_data_loader):
         """Test loading staging to raw when already in sync"""
@@ -373,9 +356,7 @@ class TestPipelineOrchestrator:
 
         assert result is None
 
-    # ============================================================================
     # CLEANUP TESTS
-    # ============================================================================
 
     def test_close(self, orchestrator, mock_bq_client):
         """Test orchestrator closes BigQuery client"""
@@ -384,9 +365,7 @@ class TestPipelineOrchestrator:
         mock_bq_client.close.assert_called_once()
 
 
-# ============================================================================
 # INTEGRATION TESTS (Higher level scenarios)
-# ============================================================================
 
 
 class TestPipelineIntegration:

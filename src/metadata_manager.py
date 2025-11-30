@@ -5,11 +5,11 @@ Records all pipeline runs with detailed status and metrics.
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-
 from src.config import (
     METADATA_TABLE,
     STATUS_SUCCESS,
     STATUS_SKIPPED,
+    STATUS_FAILED,
     get_date_range_string,
     get_month_loaded_string,
 )
@@ -58,7 +58,7 @@ class MetadataManager:
             run_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Handle None values
-            runtime_value = runtime if runtime is not None else 0
+            runtime_value = round(runtime if runtime is not None else 0, 2)
             error_msg = error_message if error_message else ""
 
             query = f"""
@@ -376,6 +376,41 @@ class MetadataManager:
             logger.error(f"Error getting loaded months: {e}")
             return []
 
+    def get_failed_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get recent failed pipeline runs.
+
+        Args:
+            limit: Number of failed runs to retrieve
+
+        Returns:
+            List of failed run records
+        """
+        try:
+            query = f"""
+                SELECT
+                    pipeline_name,
+                    date_range,
+                    month_loaded,
+                    status,
+                    rows_loaded,
+                    run_timestamp,
+                    runtime,
+                    error_message
+                FROM `{self.table_id}`
+                WHERE status = '{STATUS_FAILED}'
+                ORDER BY run_timestamp DESC
+                LIMIT {limit}
+            """
+
+            results = list(self.bq_client.execute_query(query))
+
+            return [self._row_to_dict(row) for row in results]
+
+        except Exception as e:
+            logger.error(f"Error getting failed runs: {e}")
+            return []
+
     def get_run_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Get recent run history.
@@ -433,12 +468,12 @@ class MetadataManager:
             logger.info("No run history found")
             return
 
-        logger.info("=" * 100)
+        logger.info("=" * 50)
         logger.info(f"Pipeline Run History (Last {limit} runs)")
-        logger.info("=" * 100)
+        logger.info("=" * 50)
 
         for run in history:
-            logger.info("")
+            logger.info("-" * 50)
             logger.info(f"Pipeline: {run['pipeline_name']}")
             logger.info(f"Month: {run['month_loaded']}")
             logger.info(f"Date Range: {run['date_range']}")
@@ -448,7 +483,7 @@ class MetadataManager:
             logger.info(f"Timestamp: {run['run_timestamp']}")
             if run["error_message"]:
                 logger.info(f"Error: {run['error_message']}")
-            logger.info("-" * 100)
+            logger.info("-" * 50)
 
 
 if __name__ == "__main__":
@@ -457,17 +492,17 @@ if __name__ == "__main__":
 
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        format="%(asctime)s | %(levelname)s | %(message)s",
     )
 
     try:
         bq_client = BigQueryClient()
         metadata = MetadataManager(bq_client)
 
-        print("MetadataManager initialized")
+        logger.info("MetadataManager initialized")
 
         # Print run history
-        metadata.print_run_history(limit=5)
+        metadata.log_run_history(limit=5)
 
     except Exception as e:
-        print(f"Error: {e}")
+        logger.info(f"Error: {e}")

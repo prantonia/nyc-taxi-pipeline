@@ -77,7 +77,7 @@ class PipelineOrchestrator:
 
         try:
             # Step 1: Load to Staging (only if empty)
-            logger.info("\n[STEP 1/4] Loading data to Staging layer")
+            logger.info("[STEP 1/4] Loading data to Staging layer")
             staging_rows = self.retry_handler.retry_operation(
                 self.data_loader.load_full_refresh_to_staging, "Load to Staging"
             )
@@ -88,17 +88,17 @@ class PipelineOrchestrator:
                 logger.info(f"Loaded {staging_rows:,} rows to staging")
 
             # Step 2: Load to Raw (with idempotency check)
-            logger.info("\n[STEP 2/4] Loading data to Raw layer")
+            logger.info("[STEP 2/4] Loading data to Raw layer")
             raw_rows = self._load_staging_to_raw_full()
 
             # Step 3: Transform to Silver
-            logger.info("\n[STEP 3/4] Transforming data to Silver layer")
+            logger.info("[STEP 3/4] Transforming data to Silver layer")
             self.retry_handler.retry_operation(
                 self._transform_to_silver, "Transform to Silver"
             )
 
             # Step 4: Aggregate to Gold
-            logger.info("\n[STEP 4/4] Aggregating data to Gold layer")
+            logger.info("[STEP 4/4] Aggregating data to Gold layer")
             self.retry_handler.retry_operation(
                 self._aggregate_to_gold, "Aggregate to Gold"
             )
@@ -189,7 +189,7 @@ class PipelineOrchestrator:
                     runtime=runtime,
                 )
 
-                logger.info("\n" + "=" * 50)
+                logger.info("=" * 50)
                 logger.info(
                     "INCREMENTAL PIPELINE COMPLETED - SKIPPED (full year loaded)"
                 )
@@ -270,7 +270,7 @@ class PipelineOrchestrator:
                     month=month_to_load,
                     runtime=runtime,
                 )
-                logger.info("\n" + "=" * 50)
+                logger.info("=" * 50)
                 logger.info(
                     f"INCREMENTAL PIPELINE COMPLETED - SKIPPED ({month_name} already loaded)"
                 )
@@ -470,9 +470,9 @@ if __name__ == "__main__":
 
     orchestrator = PipelineOrchestrator()
 
-    print("\n✓ Orchestrator initialized successfully")
-    print("\nTo run pipeline:")
-    print("  Full Refresh: python run_full_refresh.py")
-    print("  Incremental:  python run_incremental.py")
+    logger.info("\n✓ Orchestrator initialized successfully")
+    logger.info("\nTo run pipeline:")
+    logger.info("  Full Refresh: python run_full_refresh.py")
+    logger.info("  Incremental:  python run_incremental.py")
 
     orchestrator.close()

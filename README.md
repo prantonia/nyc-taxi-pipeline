@@ -43,7 +43,6 @@ A production-grade data engineering pipeline for processing NYC Taxi trip data u
 - Batch processing to prevent memory overflow
 - Smart date range handling for data infiltrations
 - Production-grade error handling and recovery
-- Cost-optimized queries (~$5 per full refresh)
 
 ---
 
@@ -86,7 +85,7 @@ cp service-account-key-template.json service-account-key.json
 # Edit service-account-key.json with your GCP credentials
 
 # 5. Update configuration
-# Edit src/config.py with your project ID and dataset name
+# Edit .env with your project ID and dataset name using the .env.example file
 
 # 6. Create tables
 python -c "from src.orchestrator import PipelineOrchestrator; \
@@ -225,18 +224,19 @@ nyc-taxi-pipeline/
 │   └── create_metadata_table.sql
 │
 ├── tests/                      # Test suite
+│   ├── test_Bigquery_client.py
+│   ├── test_config.py
 │   ├── test_data_loader.py
 │   ├── test_metadata.py
-│   └── test_orchestrator.py
+│   ├── test_orchestrator.py
+│   └── test_retry_handler.py
 │
 ├── .github/workflows/          # CI/CD
 │   └── ci.yml
 │
 ├── docs/                       # Documentation
-│   ├── architecture.md
 │   ├── data_dictionary.md
-│   ├── orchestration_logic.md
-│   └── ...
+│   └── project_documentation.md
 │
 ├── README.md
 ├── requirements.txt

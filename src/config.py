@@ -211,28 +211,3 @@ def validate_config():
         raise ValueError(f"Configuration errors: {', '.join(errors)}")
 
     return True
-
-
-if __name__ == "__main__":
-    # Test configuration
-    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-
-    logger.info("NYC Taxi Pipeline Configuration")
-    logger.info("=" * 50)
-    logger.info(f"Test Mode: {IS_TEST_MODE}")
-    logger.info(f"Project ID: {PROJECT_ID}")
-    logger.info(f"Dataset ID: {DATASET_ID}")
-    logger.info(f"Staging Table: {STAGING_TABLE}")
-    logger.info(f"Raw Table: {RAW_TABLE}")
-    logger.info(f"Silver Table: {SILVER_TABLE}")
-    logger.info(f"Gold Table: {GOLD_TABLE}")
-    logger.info(f"Metadata Table: {METADATA_TABLE}")
-    logger.info(f"Credentials Path: {CREDENTIALS_PATH}")
-    logger.info(f"Target Year: {TARGET_YEAR}")
-    logger.info("=" * 50)
-
-    try:
-        validate_config()
-        logger.info("Configuration is valid")
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")

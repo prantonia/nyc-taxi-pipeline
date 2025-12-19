@@ -71,7 +71,6 @@ Same as Staging Layer **except**:
 **Row Count (2024):** ~35-41 million rows
 
 ### **Filtering Logic**
-
 ```sql
 SELECT
     VendorID,
@@ -96,8 +95,14 @@ WHERE EXTRACT(YEAR FROM tpep_pickup_datetime) = 2024
 | `vendor_id` | INT64 | No | Taxi vendor identifier | VendorID | Renamed |
 | `pickup_datetime` | TIMESTAMP | No | Trip start datetime | tpep_pickup_datetime | Renamed |
 | `dropoff_datetime` | TIMESTAMP | No | Trip end datetime | tpep_dropoff_datetime | Renamed |
+| `pickup_year` | INT64 | No | Year of pickup | tpep_pickup_datetime | EXTRACT(YEAR) |
+| `pickup_month` | INT64 | No | Month of pickup (1-12) | tpep_pickup_datetime | EXTRACT(MONTH) |
+| `pickup_hour` | INT64 | No | Hour of pickup (0-23) | tpep_pickup_datetime | EXTRACT(HOUR) |
+| `pickup_dayofweek` | INT64 | No | Day of week (1=Sun, 7=Sat) | tpep_pickup_datetime | EXTRACT(DAYOFWEEK) |
 | `passenger_count` | INT64 | Yes | Number of passengers | passenger_count | Cast to INT |
 | `trip_distance` | FLOAT64 | Yes | Trip distance (miles) | trip_distance | No change |
+| `trip_duration_minutes` | FLOAT64 | Yes | Trip duration in minutes | Calculated | TIMESTAMP_DIFF/60 |
+| `avg_speed_mph` | FLOAT64 | Yes | Average speed (mph) | Calculated | distance/duration |
 | `rate_code_id` | INT64 | Yes | Rate code | RatecodeID | Cast to INT |
 | `store_and_fwd_flag` | STRING | Yes | Storage flag | store_and_fwd_flag | No change |
 | `pickup_location_id` | INT64 | Yes | Pickup zone | PULocationID | Renamed |
@@ -118,6 +123,8 @@ WHERE EXTRACT(YEAR FROM tpep_pickup_datetime) = 2024
 Applied during Silver layer creation:
 - passenger_count cast to INT64
 - rate_code_id cast to INT64
+- Time-based columns extracted for analysis
+- Trip duration and speed calculated
 - Standardized column naming (snake_case)
 - Descriptive names for business users
 
@@ -127,56 +134,216 @@ Applied during Silver layer creation:
 
 ## **Gold Layer (Gold)**
 
-**Table:** `gold_daily_metrics`
-**Purpose:** Aggregated business metrics for analytics
-**Granularity:** Daily + Payment Type
+**Table:** `gold_yellow_taxi`
+
+**Purpose:** Pre-aggregated, analytics-ready data organized by aggregation type
+
+**Granularity:** Multiple (monthly, daily, hourly, top locations)
+
+**Refresh Strategy:** Full table replacement (CREATE OR REPLACE)
+
+### **Overview**
+
+The Gold layer contains multiple aggregation types in a single unified table. Each row represents statistics for a specific aggregation level (monthly, daily, hourly, or location-based). This design enables flexible analytics while maintaining a simple schema.
 
 ### **Columns**
 
-| Column Name | Data Type | Nullable | Description | Calculation |
-|-------------|-----------|----------|-------------|-------------|
-| `trip_date` | DATE | No | Trip date (from pickup) | DATE(pickup_datetime) |
-| `payment_type` | INT64 | No | Payment method | From silver layer |
-| `trip_count` | INT64 | No | Total trips | COUNT(*) |
-| `total_passengers` | INT64 | Yes | Total passengers | SUM(passenger_count) |
-| `total_distance` | FLOAT64 | Yes | Total miles traveled | SUM(trip_distance) |
-| `total_fare_amount` | FLOAT64 | Yes | Total fare revenue | SUM(fare_amount) |
-| `total_tip_amount` | FLOAT64 | Yes | Total tips | SUM(tip_amount) |
-| `total_amount` | FLOAT64 | Yes | Total revenue | SUM(total_amount) |
-| `avg_fare_amount` | FLOAT64 | Yes | Average fare per trip | AVG(fare_amount) |
-| `avg_trip_distance` | FLOAT64 | Yes | Average trip distance | AVG(trip_distance) |
-| `avg_tip_amount` | FLOAT64 | Yes | Average tip per trip | AVG(tip_amount) |
+| Column Name | Data Type | Nullable | Description | Populated For |
+|-------------|-----------|----------|-------------|---------------|
+| `aggregation_type` | STRING | No | Type of aggregation | All rows |
+| `dimension_value` | STRING | No | Primary dimension identifier | All rows |
+| `dimension_label` | STRING | No | Human-readable label | All rows |
+| `reference_date` | DATE | Yes | Reference date for time-based aggregations | monthly, daily |
+| `total_trips` | INT64 | Yes | Total number of trips | monthly, daily, hourly |
+| `total_distance` | FLOAT64 | Yes | Sum of trip distances (miles) | monthly |
+| `avg_distance` | FLOAT64 | Yes | Average trip distance (miles) | All |
+| `avg_duration_minutes` | FLOAT64 | Yes | Average trip duration | monthly, daily, hourly |
+| `avg_speed_mph` | FLOAT64 | Yes | Average speed (mph) | monthly |
+| `total_revenue` | FLOAT64 | Yes | Total revenue collected | All |
+| `avg_revenue_per_trip` | FLOAT64 | Yes | Average revenue per trip | All |
+| `total_passengers` | INT64 | Yes | Total passengers transported | monthly |
+| `avg_passengers_per_trip` | FLOAT64 | Yes | Average passengers per trip | monthly |
+| `credit_card_trips` | INT64 | Yes | Number of credit card payments | monthly |
+| `cash_trips` | INT64 | Yes | Number of cash payments | monthly |
+| `credit_card_pct` | FLOAT64 | Yes | Percentage paid by credit card | monthly |
+| `morning_rush_trips` | INT64 | Yes | Trips 6 AM - 9 AM | monthly |
+| `evening_rush_trips` | INT64 | Yes | Trips 4 PM - 7 PM | monthly |
+| `weekend_trips` | INT64 | Yes | Trips on Sat/Sun | monthly, daily |
+| `weekday_trips` | INT64 | Yes | Trips Mon-Fri | monthly, daily |
+| `pickup_count` | INT64 | Yes | Pickup count at location | top_locations |
+| `hour_label` | STRING | Yes | Formatted hour label | hourly |
 
-### **Aggregation Logic**
+---
 
-```sql
-SELECT
-    DATE(pickup_datetime) as trip_date,
-    payment_type,
-    COUNT(*) as trip_count,
-    SUM(passenger_count) as total_passengers,
-    SUM(trip_distance) as total_distance,
-    SUM(fare_amount) as total_fare_amount,
-    SUM(tip_amount) as total_tip_amount,
-    SUM(total_amount) as total_amount,
-    AVG(fare_amount) as avg_fare_amount,
-    AVG(trip_distance) as avg_trip_distance,
-    AVG(tip_amount) as avg_tip_amount
-FROM silver_yellow_taxi
-GROUP BY trip_date, payment_type
-ORDER BY trip_date, payment_type
+## **Aggregation Types**
+
+### **1. Monthly Aggregation** (`aggregation_type = 'monthly'`)
+
+**Purpose:** Month-level statistics for trend analysis  
+**Granularity:** One row per month (12 rows for full year)
+
+**Key Fields:**
+- `dimension_value`: Month number ('1', '2', ..., '12')
+- `dimension_label`: Month name ('January', 'February', etc.)
+- `reference_date`: First day of month (2024-01-01, 2024-02-01, etc.)
+
+**Populated Metrics:**
+- All trip metrics (trips, distance, duration, speed)
+- All revenue metrics
+- All passenger metrics
+- Payment type breakdown
+- Rush hour analysis
+- Weekend vs weekday split
+
+**Example Row:**
+```
+aggregation_type: 'monthly'
+dimension_value: '1'
+dimension_label: 'January'
+reference_date: 2024-01-01
+total_trips: 2964624
+total_revenue: 54123456.78
+avg_distance: 3.25
+credit_card_pct: 76.0
 ```
 
-**Row Count:** ~400-500 rows (365 days × payment types)
+---
 
-### **Business Insights**
+### **2. Daily Aggregation** (`aggregation_type = 'daily'`)
 
-This table enables analysis of:
-- Daily trip volumes
-- Revenue trends
-- Payment method preferences
-- Distance patterns
-- Tipping behavior
+**Purpose:** Daily pattern analysis  
+**Granularity:** One row per day (365 rows for full year)
+
+**Key Fields:**
+- `dimension_value`: Date string ('2024-01-15')
+- `dimension_label`: Day name ('Monday', 'Tuesday', etc.)
+- `reference_date`: The trip date
+
+**Populated Metrics:**
+- total_trips, avg_distance, avg_duration_minutes
+- total_revenue, avg_revenue_per_trip
+- weekend_trips, weekday_trips
+
+**Example Row:**
+```
+aggregation_type: 'daily'
+dimension_value: '2024-01-15'
+dimension_label: 'Monday'
+reference_date: 2024-01-15
+total_trips: 95000
+total_revenue: 1750000.50
+avg_distance: 3.15
+```
+
+---
+
+### **3. Hourly Aggregation** (`aggregation_type = 'hourly'`)
+
+**Purpose:** Hour-of-day pattern analysis  
+**Granularity:** One row per hour (24 rows)
+
+**Key Fields:**
+- `dimension_value`: Hour number ('0', '1', ..., '23')
+- `hour_label`: Formatted hour ('Hour 0:00', 'Hour 14:00', etc.)
+
+**Populated Metrics:**
+- total_trips (as trips_per_hour)
+- avg_distance, avg_duration_minutes
+- total_revenue, avg_revenue_per_trip
+
+**Example Row:**
+```
+aggregation_type: 'hourly'
+dimension_value: '14'
+hour_label: 'Hour 14:00'
+total_trips: 125000
+total_revenue: 2250000.00
+avg_distance: 3.5
+```
+
+---
+
+### **4. Top Locations Aggregation** (`aggregation_type = 'top_locations'`)
+
+**Purpose:** Busiest pickup location analysis  
+**Granularity:** Top 100 locations (with > 1000 pickups)
+
+**Key Fields:**
+- `dimension_value`: Location ID string ('237', '161', etc.)
+- `dimension_label`: Location label ('Location 237', etc.)
+
+**Populated Metrics:**
+- pickup_count
+- avg_distance (as avg_trip_distance)
+- total_revenue, avg_revenue_per_trip
+
+**Filter Criteria:**
+- Minimum 1000 pickups
+- Top 100 by pickup count
+
+**Example Row:**
+```
+aggregation_type: 'top_locations'
+dimension_value: '237'
+dimension_label: 'Location 237'
+pickup_count: 45000
+total_revenue: 825000.00
+avg_distance: 2.8
+```
+
+---
+
+## **Gold Layer Usage Examples**
+
+### **Query Monthly Trends**
+```sql
+SELECT 
+    dimension_label AS month,
+    total_trips,
+    total_revenue,
+    avg_distance,
+    credit_card_pct
+FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
+WHERE aggregation_type = 'monthly'
+ORDER BY reference_date;
+```
+
+### **Query Peak Hours**
+```sql
+SELECT 
+    hour_label,
+    total_trips,
+    avg_revenue_per_trip
+FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
+WHERE aggregation_type = 'hourly'
+ORDER BY total_trips DESC
+LIMIT 5;
+```
+
+### **Query Top Pickup Locations**
+```sql
+SELECT 
+    dimension_label AS location,
+    pickup_count,
+    total_revenue,
+    avg_distance
+FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
+WHERE aggregation_type = 'top_locations'
+ORDER BY pickup_count DESC
+LIMIT 10;
+```
+
+### **Compare Weekend vs Weekday**
+```sql
+SELECT 
+    dimension_label AS month,
+    weekday_trips,
+    weekend_trips,
+    ROUND(weekend_trips * 100.0 / (weekday_trips + weekend_trips), 2) AS weekend_pct
+FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
+WHERE aggregation_type = 'monthly'
+ORDER BY reference_date;
+```
 
 ---
 
@@ -210,10 +377,10 @@ This table enables analysis of:
 
 This table is used to:
 - Track pipeline execution history
-- Determine next month to load
-- Monitor pipeline health
-- Debug failures
-- Calculate performance metrics
+- Determine next month to load (incremental mode)
+- Monitor pipeline health and performance
+- Debug failures with detailed error messages
+- Calculate runtime metrics and trends
 
 ---
 
@@ -222,7 +389,7 @@ This table is used to:
 ### **Naming Standards**
 
 - **Staging/Raw:** Original column names preserved
-- **Silver:** snake_case, descriptive names
+- **Silver:** snake_case, descriptive names with calculated fields
 - **Gold:** Business-friendly aggregation names
 
 ### **Type Conversions**
@@ -232,58 +399,46 @@ This table is used to:
 | FLOAT64 (passenger_count) | INT64 | Always whole numbers |
 | FLOAT64 (RatecodeID) | INT64 | Always whole numbers |
 | tpep_* | pickup/dropoff_* | More descriptive |
+| - | pickup_year, pickup_month, etc. | Extracted for analysis |
+| - | trip_duration_minutes | Calculated field |
+| - | avg_speed_mph | Calculated field |
 
 ---
 
-## **Common Queries**
+## **Business Metric Definitions**
 
-### **Check Staging Partitions**
+### **Revenue Metrics**
+- `total_revenue` = Sum of all total_amount (fare + tips + surcharges + taxes)
+- `avg_revenue_per_trip` = total_revenue / total_trips
+- `credit_card_pct` = (credit_card_trips / total_trips) × 100
 
-```sql
-SELECT
-    source_month,
-    COUNT(*) as row_count,
-    MIN(tpep_pickup_datetime) as min_date,
-    MAX(tpep_pickup_datetime) as max_date
-FROM `staging_yellow_taxi`
-GROUP BY source_month
-ORDER BY source_month;
-```
+### **Operational Metrics**
+- `avg_speed_mph` = trip_distance / (trip_duration_minutes / 60)
+- `trip_duration_minutes` = TIMESTAMP_DIFF(dropoff, pickup) / 60
+- `morning_rush_trips` = Trips between 6:00 AM - 9:00 AM
+- `evening_rush_trips` = Trips between 4:00 PM - 7:00 PM
 
-### **Verify 2024 Data in Raw**
+### **Time Classifications**
+- `weekday` = Monday-Friday (DAYOFWEEK 2-6)
+- `weekend` = Saturday-Sunday (DAYOFWEEK 1, 7)
+- Payment Type: 1=Credit Card, 2=Cash
 
-```sql
-SELECT
-    EXTRACT(YEAR FROM tpep_pickup_datetime) as year,
-    COUNT(*) as row_count
-FROM `raw_yellow_taxi`
-GROUP BY year
-ORDER BY year;
-```
+---
 
-### **Silver Layer Stats**
+## **Data Quality Notes**
 
-```sql
-SELECT
-    COUNT(*) as total_rows,
-    COUNT(DISTINCT DATE(pickup_datetime)) as unique_days,
-    MIN(pickup_datetime) as first_trip,
-    MAX(pickup_datetime) as last_trip
-FROM `silver_yellow_taxi`;
-```
+### **Gold Layer**
+- All monetary values rounded to 2 decimal places
+- All averages rounded to 2 decimal places
+- Top locations filtered to > 1000 pickups (significance threshold)
+- Limited to top 100 locations by volume
+- Full table refresh on every pipeline run (no incremental update)
 
-### **Gold Layer Summary**
-
-```sql
-SELECT
-    payment_type,
-    COUNT(*) as days_with_data,
-    SUM(trip_count) as total_trips,
-    SUM(total_amount) as total_revenue
-FROM `gold_daily_metrics`
-GROUP BY payment_type
-ORDER BY payment_type;
-```
+### **Silver Layer**
+- Negative durations filtered out
+- Zero distance trips handled
+- NULL values preserved for optional fields
+- Calculated fields may be NULL if source data incomplete
 
 ---
 
@@ -301,8 +456,6 @@ ORDER BY payment_type;
 - Distance in miles
 - Negative values may indicate refunds/corrections
 - NULL values indicate missing/not applicable data
+- Gold layer uses unified schema for all aggregation types
 
 ---
-
-**Last Updated:** November 2024
-**Version:** 1.0

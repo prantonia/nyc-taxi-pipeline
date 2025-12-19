@@ -49,7 +49,7 @@ A production-grade data engineering pipeline for processing NYC Taxi trip data u
 
 ## **Architecture**
 
-![Pipeline Architecture](assets/NYCPipeline.svg)
+![Pipeline Architecture](assets/architecture.svg)
 
 **Key Components:**
 - **Python Orchestrator** - Coordinates all pipeline operations

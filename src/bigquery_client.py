@@ -297,24 +297,3 @@ class BigQueryClient:
             logger.info("BigQuery client closed")
         except Exception as e:
             logger.warning(f"Error closing BigQuery client: {e}")
-
-
-if __name__ == "__main__":
-    # Test BigQuery client
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    )
-
-    try:
-        client = BigQueryClient()
-        logger.info("BigQuery client initialized successfully")
-
-        # Test simple query
-        query = "SELECT 1 as test"
-        results = client.execute_query(query)
-        logger.info(f"Test query executed: {list(results)}")
-
-        client.close()
-    except Exception as e:
-        logger.error(f"Error: {e}")

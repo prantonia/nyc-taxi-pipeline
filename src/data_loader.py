@@ -527,34 +527,3 @@ class DataLoader:
         except Exception as e:
             logger.error(f"Failed incremental load for month {month}: {e}")
             raise
-
-
-if __name__ == "__main__":
-    # Test data loader
-    from src.bigquery_client import BigQueryClient
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(module)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    try:
-        bq_client = BigQueryClient()
-        loader = DataLoader(bq_client)
-
-        logger.info("DataLoader initialized")
-
-        # Test staging check
-        is_empty = loader.is_staging_empty()
-        logger.info(f"Staging is empty: {is_empty}")
-
-        # Test row counts
-        staging_count = loader.get_staging_row_count_2024()
-        raw_count = loader.get_raw_row_count()
-
-        logger.info(f"Staging 2024 rows: {staging_count:,}")
-        logger.info(f"Raw rows: {raw_count:,}")
-
-    except Exception as e:
-        logger.error(f"Error: {e}")

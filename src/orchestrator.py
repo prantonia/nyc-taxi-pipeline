@@ -456,23 +456,3 @@ class PipelineOrchestrator:
         """Close all connections."""
         self.bq_client.close()
         logger.info("Pipeline orchestrator closed")
-
-
-if __name__ == "__main__":
-    # Test orchestrator
-    import sys
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-
-    orchestrator = PipelineOrchestrator()
-
-    logger.info("\n✓ Orchestrator initialized successfully")
-    logger.info("\nTo run pipeline:")
-    logger.info("  Full Refresh: python run_full_refresh.py")
-    logger.info("  Incremental:  python run_incremental.py")
-
-    orchestrator.close()

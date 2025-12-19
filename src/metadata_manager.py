@@ -118,7 +118,7 @@ class MetadataManager:
                 FROM `{self.table_id}`
                 WHERE pipeline_name = '{pipeline_name}'
                     AND status = '{STATUS_SUCCESS}'
-                ORDER BY run_timestamp DESC
+                ORDER BY month_loaded DESC
                 LIMIT 1
             """
 
@@ -161,7 +161,7 @@ class MetadataManager:
                 FROM `{self.table_id}`
                 WHERE pipeline_name = '{pipeline_name}'
                     AND month_loaded != 'full year'
-                ORDER BY run_timestamp DESC
+                ORDER BY month_loaded DESC
                 LIMIT 1
             """
 
@@ -211,7 +211,7 @@ class MetadataManager:
                 WHERE pipeline_name = '{pipeline_name}'
                     AND status = '{STATUS_SUCCESS}'
                     AND month_loaded != 'full year'
-                ORDER BY run_timestamp DESC
+                ORDER BY month_loaded DESC
                 LIMIT 1
             """
 
@@ -262,7 +262,7 @@ class MetadataManager:
                 WHERE pipeline_name = '{pipeline_name}'
                     AND (status = '{STATUS_SUCCESS}' OR status = '{STATUS_SKIPPED}')
                     AND month_loaded != 'full year'
-                ORDER BY run_timestamp DESC
+                ORDER BY month_loaded DESC
                 LIMIT 1
             """
 
@@ -399,7 +399,7 @@ class MetadataManager:
                     error_message
                 FROM `{self.table_id}`
                 WHERE status = '{STATUS_FAILED}'
-                ORDER BY run_timestamp DESC
+                ORDER BY month_loaded DESC
                 LIMIT {limit}
             """
 
@@ -433,7 +433,7 @@ class MetadataManager:
                     runtime,
                     error_message
                 FROM `{self.table_id}`
-                ORDER BY run_timestamp DESC
+                ORDER BY month_loaded DESC
                 LIMIT {limit}
             """
 
@@ -484,25 +484,3 @@ class MetadataManager:
             if run["error_message"]:
                 logger.info(f"Error: {run['error_message']}")
             logger.info("-" * 50)
-
-
-if __name__ == "__main__":
-    # Test metadata manager
-    from src.bigquery_client import BigQueryClient
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(message)s",
-    )
-
-    try:
-        bq_client = BigQueryClient()
-        metadata = MetadataManager(bq_client)
-
-        logger.info("MetadataManager initialized")
-
-        # Print run history
-        metadata.log_run_history(limit=5)
-
-    except Exception as e:
-        logger.info(f"Error: {e}")

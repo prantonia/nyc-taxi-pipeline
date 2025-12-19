@@ -41,7 +41,3 @@ def main():
     except Exception as e:
         logger.error(f"Failed to create tables: {e}")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

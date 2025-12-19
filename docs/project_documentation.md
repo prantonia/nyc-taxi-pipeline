@@ -205,7 +205,7 @@ With our infrastructure set up, we can now dive into the architecture of the pip
 
 ### The Architectural Diagram
 
-![Pipeline Architecture](../assets/NYCPipeline.svg)
+![Pipeline Architecture](../assets/architecture.svg)
 
 ### The Medallion Architecture
 
@@ -277,20 +277,6 @@ df = arrow_table.to_pandas()
 # BigQuery client automatically uses PyArrow when available
 client.load_table_from_dataframe(df, table_id)
 ```
-
-### Cost Optimization Strategies
-
-Running data pipelines on Google Cloud can get expensive quickly if you're not careful. I implemented several strategies to keep costs under control while maintaining production-grade quality.
-
-The most impactful optimization was partitioning the staging table by source month. BigQuery charges based on data scanned by queries. When you query a partitioned table and include a partition filter in your WHERE clause, BigQuery only scans the relevant partitions. My idempotency checks query staging with WHERE source_month = X, which only scans one partition instead of the entire table. This makes checks essentially free—I've run hundreds of these checks and they show up as 0 bytes processed in billing.
-
-I also carefully structured my SQL queries to avoid full table scans. BigQuery is smart about optimization, but you have to give it the right conditions. Using EXTRACT(YEAR FROM date) forces BigQuery to examine every row. Using date >= '2024-01-01' AND date < '2025-01-01' allows BigQuery to use partition pruning and other optimizations.
-
-The batch processing approach also saves money. If I tried to load all 41 million rows at once, I'd need to keep gigabytes of data in memory, which requires expensive compute resources. By processing one month at a time, I keep memory usage under 1GB and use smaller, cheaper compute instances.
-
-The PyArrow optimization I mentioned earlier had direct cost benefits too. Faster processing means less compute time, which means lower costs. The 40% reduction in pipeline runtime translated to roughly 30% reduction in BigQuery compute costs.
-
-All these optimizations added up. My initial unoptimized pipeline runs cost about $7. After all optimizations, the same pipeline runs cost about $5. Over many runs during development and ongoing operations, these savings become significant.
 
 ### Design Decisions and Trade-offs
 
@@ -913,16 +899,6 @@ ORDER BY reference_date;
 
 This query shows the big picture for each month. You can see which months are busiest, which generate the most revenue, and how average trip characteristics vary throughout the year.
 
-**Sample Results:**
-```
-month_name  | total_trips | total_revenue  | avg_revenue_per_trip | avg_distance | avg_duration_minutes
-------------|-------------|----------------|---------------------|--------------|---------------------
-January     | 2,964,624   | $43,256,789.50 | $14.59              | 3.12         | 15.8
-February    | 2,847,123   | $41,678,234.25 | $14.64              | 3.08         | 15.6
-March       | 3,126,789   | $45,789,456.75 | $14.64              | 3.15         | 15.9
-...
-```
-
 **Query 2: Payment method trends by month**
 
 ```sql
@@ -964,28 +940,17 @@ Daily aggregations help identify day-of-week patterns and unusual days.
 ```sql
 SELECT
     dimension_label AS day_name,
-    ROUND(AVG(daily_trips), 0) AS avg_trips,
-    ROUND(AVG(daily_revenue), 2) AS avg_revenue,
+    ROUND(AVG(total_trips), 2) AS avg_trips,
+    ROUND(AVG(total_revenue), 2) AS avg_revenue,
     ROUND(AVG(avg_distance), 2) AS avg_distance,
-    ROUND(AVG(avg_fare), 2) AS avg_fare
+    ROUND(AVG(avg_revenue_per_trip), 2) AS avg_fare
 FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
 WHERE aggregation_type = 'daily'
-GROUP BY dimension_label, pickup_dayofweek
-ORDER BY pickup_dayofweek;
+GROUP BY dimension_label
+ORDER BY dimension_label;
 ```
 
 This query aggregates across all weeks to show typical patterns for each day of the week. You'll likely see that weekdays have different patterns than weekends.
-
-**Sample Results:**
-```
-day_name  | avg_trips | avg_revenue    | avg_distance | avg_fare
-----------|-----------|----------------|--------------|----------
-Monday    | 98,523    | $1,438,234.50  | 3.14         | $14.60
-Tuesday   | 102,456   | $1,495,678.25  | 3.12         | $14.58
-...
-Saturday  | 115,789   | $1,689,456.75  | 3.45         | $14.75
-Sunday    | 89,234    | $1,302,345.50  | 3.38         | $14.70
-```
 
 **Query 5: Busiest and slowest days**
 
@@ -994,22 +959,22 @@ Sunday    | 89,234    | $1,302,345.50  | 3.38         | $14.70
 SELECT
     dimension_value AS date,
     dimension_label AS day_name,
-    daily_trips,
-    daily_revenue
+    total_trips,
+    total_revenue
 FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
 WHERE aggregation_type = 'daily'
-ORDER BY daily_trips DESC
+ORDER BY total_trips DESC
 LIMIT 10;
 
 -- Slowest days
 SELECT
     dimension_value AS date,
     dimension_label AS day_name,
-    daily_trips,
-    daily_revenue
+    total_trips,
+    total_revenue
 FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
 WHERE aggregation_type = 'daily'
-ORDER BY daily_trips ASC
+ORDER BY total_trips ASC
 LIMIT 10;
 ```
 
@@ -1023,28 +988,17 @@ Hourly aggregations reveal intraday patterns like rush hours and late-night acti
 
 ```sql
 SELECT
-    dimension_label AS hour,
-    trips_per_hour,
-    avg_revenue AS avg_fare_per_trip,
-    total_revenue_hour,
-    ROUND(trips_per_hour * 100.0 / SUM(trips_per_hour) OVER (), 2) AS pct_of_daily_trips
+    hour_label AS hour,
+    total_trips AS trips_per_hour,
+    avg_revenue_per_trip AS avg_fare_per_trip,
+    total_revenue AS total_revenue_hour,
+    ROUND(total_trips * 100.0 / SUM(total_trips) OVER (), 2) AS pct_of_daily_trips
 FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
 WHERE aggregation_type = 'hourly'
 ORDER BY CAST(dimension_value AS INT64);
 ```
 
 This query shows how taxi usage varies throughout the day. You'll see clear peaks during morning and evening rush hours, and valleys during early morning hours.
-
-**Sample Results:**
-```
-hour      | trips_per_hour | avg_fare_per_trip | total_revenue_hour | pct_of_daily_trips
-----------|----------------|-------------------|-------------------|-------------------
-Hour 0:00 | 125,456        | $18.25            | $2,289,568.00     | 3.58%
-Hour 1:00 | 98,234         | $19.50            | $1,915,563.00     | 2.80%
-...
-Hour 8:00 | 178,923        | $12.50            | $2,236,537.50     | 5.11%
-Hour 18:00| 195,678        | $13.75            | $2,690,572.50     | 5.58%
-```
 
 **Query 7: Peak vs off-peak comparison**
 
@@ -1053,12 +1007,12 @@ SELECT
     CASE 
         WHEN CAST(dimension_value AS INT64) BETWEEN 6 AND 9 THEN 'Morning Rush'
         WHEN CAST(dimension_value AS INT64) BETWEEN 16 AND 19 THEN 'Evening Rush'
-        WHEN CAST(dimension_value AS INT64) BETWEEN 22 AND 5 THEN 'Late Night'
+        WHEN CAST(dimension_value AS INT64) >= 22 OR CAST(dimension_value AS INT64) <= 5 THEN 'Late Night'
         ELSE 'Off Peak'
     END AS period,
-    SUM(trips_per_hour) AS total_trips,
-    ROUND(AVG(avg_revenue), 2) AS avg_fare,
-    SUM(total_revenue_hour) AS total_revenue
+    SUM(total_trips) AS total_trips,
+    ROUND(AVG(avg_revenue_per_trip), 2) AS avg_fare,
+    ROUND(SUM(total_revenue), 2) AS total_revenue
 FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.gold_yellow_taxi`
 WHERE aggregation_type = 'hourly'
 GROUP BY period
@@ -1076,7 +1030,6 @@ Location aggregations identify popular pickup zones and their characteristics.
 ```sql
 SELECT
     CAST(dimension_value AS INT64) AS location_id,
-    dimension_label,
     pickup_count,
     total_revenue,
     avg_distance,
@@ -1089,15 +1042,6 @@ LIMIT 20;
 ```
 
 This identifies the busiest taxi zones in the city. These are likely major business districts, transportation hubs, and tourist areas.
-
-**Sample Results:**
-```
-location_id | dimension_label | pickup_count | total_revenue   | avg_distance | pct_of_total_revenue
-------------|-----------------|--------------|-----------------|--------------|---------------------
-161         | Location 161    | 1,589,234    | $23,456,789.50  | 2.8          | 4.25%
-237         | Location 237    | 1,423,567    | $21,234,567.75  | 3.1          | 3.85%
-...
-```
 
 **Query 9: Locations with highest average revenue**
 
@@ -1420,6 +1364,7 @@ WITH daily_runs AS (
         DATE(run_timestamp) AS run_date,
         COUNT(*) AS total_runs,
         SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS successful_runs,
+        SUM(CASE WHEN status = 'SKIPPED' THEN 1 ELSE 0 END) AS skipped_runs,
         SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failed_runs
     FROM `nyc-taxi-pipeline-477912.nyc_taxi_dataset.pipeline_metadata`
     GROUP BY run_date
@@ -1428,6 +1373,7 @@ SELECT
     run_date,
     total_runs,
     successful_runs,
+    skipped_runs,
     failed_runs,
     ROUND(successful_runs * 100.0 / total_runs, 2) AS success_rate_pct
 FROM daily_runs
@@ -1436,30 +1382,6 @@ LIMIT 30;
 ```
 
 This calculates daily success rates. A healthy pipeline should have 95%+ success rate. If success rate drops below 90%, investigate what's causing the failures.
-
----
-
-### Maintenance Tasks
-
-Regular maintenance keeps the pipeline running smoothly.
-
-**Monthly tasks:**
-- Review metadata for any patterns in failures
-- Check BigQuery storage costs and optimize if needed
-- Review logs for any recurring warnings
-- Update dependencies if security updates are available
-
-**Quarterly tasks:**
-- Review and optimize SQL queries for performance
-- Analyze cost trends and identify optimization opportunities
-- Update documentation with any changes
-- Review and update credentials/access controls
-
-**Annual tasks:**
-- Full security review of credentials and access
-- Comprehensive performance analysis
-- Evaluate if architecture changes would improve operations
-- Update disaster recovery procedures and test restoration
 
 ---
 
@@ -1476,16 +1398,6 @@ The lesson: Real-world data has surprises. Source files contain data from dates 
 The solution—row-based checking with boundary rows—works because it verifies actual data presence rather than making assumptions based on metadata. This approach handles partial loads, infiltrations, and all the edge cases that simple date checks miss.
 
 When building your own pipelines, invest time in robust idempotency checking early. Test it by deliberately interrupting loads midway. Verify it works with messy, real-world data. The time spent here pays dividends in reliability.
-
-### Performance Optimization Directly Impacts Cost
-
-When I first tested the pipeline, processing took 30+ minutes and cost $7 per run. These numbers seemed acceptable for occasional runs, but they weren't sustainable for daily operation or frequent development iteration.
-
-Switching to PyArrow reduced runtime by 40% and costs by 30%. Partitioning the staging table made idempotency checks essentially free. Optimizing SQL queries further reduced data scanned and costs. These optimizations compounded—the final pipeline runs in 18 minutes and costs $5.
-
-The lesson: Performance and cost are directly linked in cloud data processing. Faster pipelines cost less because you're using compute resources for less time. Efficient queries cost less because they process less data.
-
-When optimizing, profile your pipeline to find bottlenecks. Focus on the slowest operations first—optimizing a 30-second operation saves more than optimizing a 3-second operation. Consider both time and data scanned when evaluating cloud costs.
 
 ### Two Bronze Layers Solve Real Problems
 
@@ -1505,7 +1417,7 @@ Good metadata transforms a pipeline from a black box to an observable system. Wh
 
 ### CI/CD and Data Processing Should Be Separate
 
-Early versions of this project ran the entire data pipeline in GitHub Actions. This seemed convenient—everything automated in one place! But it created problems: slow CI feedback (18 minutes per run), wasted CI resources (processing data on every code change), security risks (production credentials in CI), and conflated failure modes (hard to tell if failures were code problems or data problems).
+Early versions of this project ran the entire data pipeline in GitHub Actions. This seemed convenient—everything automated in one place! But it created problems: slow CI feedback, wasted CI resources (processing data on every code change), security risks (production credentials in CI), and conflated failure modes (hard to tell if failures were code problems or data problems).
 
 Separating CI (code validation) from cron (data processing) solved all these problems. CI now gives fast feedback (2-3 minutes) and focuses on what CI is good at (validating code). Cron handles data processing with appropriate resources and credentials.
 
@@ -1513,7 +1425,7 @@ The lesson: Use each system for what it's designed for. CI/CD is for validating 
 
 ### Documentation is Code
 
-Six weeks into the project, I couldn't remember why I made certain design decisions. I had to re-read code and reconstruct the reasoning. This wasted time and almost led to undoing good decisions because I didn't understand their purpose.
+Few weeks into the project, I couldn't remember why I made certain design decisions. I had to re-read code and reconstruct the reasoning. This wasted time and almost led to undoing good decisions because I didn't understand their purpose.
 
 I learned to document not just what the code does, but why it does it. Architecture decisions include the alternatives I considered and why I chose this approach. Complex logic has comments explaining the reasoning, not just describing the operations. Design trade-offs are documented so future me understands what I'm giving up for what I'm gaining.
 
@@ -1544,14 +1456,6 @@ Switching from pure pandas to PyArrow required learning a new API and understand
 PyArrow's columnar format aligns with parquet and BigQuery's internal formats, enabling efficient zero-copy operations. This isn't just academic—it's the difference between 30-minute pipeline runs and 18-minute runs.
 
 The lesson: Sometimes the "more complex" solution is actually simpler in the long run. PyArrow seemed complex initially, but it's purpose-built for this use case. Using the right tool for the job often means better performance with less code.
-
-### Cost Consciousness from Day One
-
-I didn't initially think much about costs—GCP's free tier seemed generous, and I assumed costs would be negligible for this dataset size. Then I saw the first bills and realized that careless queries could cost $10+ each.
-
-Adding partitioning, optimizing queries, and implementing smart caching reduced costs by 60%. More importantly, understanding cost drivers shaped architecture decisions—using CREATE OR REPLACE rather than incremental updates, processing one month at a time rather than all data together, checking metadata before expensive operations.
-
-The lesson: Understand the cost model of your cloud platform early. Design with costs in mind from the beginning. It's much harder to optimize costs after your architecture is set. Small decisions compound—a $0.50 optimization per run saves $180 per year.
 
 ### Resilience Through Retry and Idempotency
 
@@ -1652,7 +1556,5 @@ Data engineering is about much more than moving data from A to B. It's about bui
 The journey from "just load some data" to understanding production-grade data engineering involves encountering real problems and solving them properly. Date infiltrations taught me about data quality. Performance issues taught me about optimization. Failed runs taught me about resilience. Each challenge improved the system and deepened understanding.
 
 I hope this documentation helps you on your own data engineering journey. Whether you're a student learning the field, a professional building your first pipeline, or an experienced engineer looking for new patterns, I hope the detailed explanations and reasoning prove valuable.
-
-Thank you for taking the time to read this comprehensive documentation. Now go build something amazing.
 
 ---
